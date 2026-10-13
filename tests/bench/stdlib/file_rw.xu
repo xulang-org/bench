@@ -1,0 +1,94 @@
+@main
+
+#os
+#path/filepath as fp
+
+fn checksum(s string) int {
+    mut sum := 0
+    mut i := 0
+    while i < s.len {
+        sum += s[i]
+        i += 1
+    }
+    << sum
+}
+
+fn main() int {
+    dir := os.mkdir_temp("", "xu-stdlib-rw-") or (err) {
+        println("m")
+        << 0
+    }
+    dir_copy := dir + ""
+    mut path_parts := []string{}
+    path_parts.push(dir_copy)
+    path_parts.push("payload.bin")
+    file := fp.join(path_parts)
+    file2 := file + ".fd"
+    file2_create := file2 + ""
+
+    mut payload := "abcdefghijklmnopqrstuvwxyz0123456789abcdef"
+    mut i := 0
+    mut total := 0
+    while i < 32 {
+        os.write(file, payload) or (err) {
+            println("w")
+            << 1
+        }
+        payload = payload + "0123456789"
+        i += 1
+    }
+    while i < 256 {
+        os.write(file, payload) or (err) {
+            println("w")
+            << 1
+        }
+        i += 1
+    }
+
+    i = 0
+    while i < 256 {
+        data := os.read(file) or (err) {
+            println("r")
+            << 1
+        }
+        total += data.len + checksum(data)
+        i += 1
+    }
+
+    mut f := os.create(file2_create) or (err) {
+        println("c")
+        << 1
+    }
+    i = 0
+    while i < 128 {
+        n := f.write(payload) or (err) {
+            println("f")
+            << 0
+        }
+        total += n
+        i += 1
+    }
+    f.close() or (err) {
+        println("x")
+        << 1
+    }
+
+    i = 0
+    while i < 16 {
+        got := os.read(file2) or (err) {
+            println("q")
+            << 1
+        }
+        if got.len == 0 {
+            i = 16
+            <-
+        }
+        total += got.len + checksum(got)
+        i += 1
+    }
+
+    os.remove_all(dir + "")
+
+    println(total)
+    << 0
+}

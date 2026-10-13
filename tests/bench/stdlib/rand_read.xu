@@ -1,0 +1,22 @@
+@main
+
+#crypto/rand
+
+fn main() int {
+    mut total := 0
+    mut i := 0
+    while i < 256 {
+        chunk := crypto.rand.read(2048) or (err) {
+            println("r")
+            << 1
+        }
+        total += chunk.len
+        if chunk.len > 0 {
+            total += chunk[0]
+            total += chunk[chunk.len - 1]
+        }
+        i += 1
+    }
+    println(total)
+    << 0
+}

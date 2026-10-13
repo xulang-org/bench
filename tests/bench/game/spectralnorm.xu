@@ -1,0 +1,111 @@
+@main
+
+#math
+
+// Benchmarks Game spectral-norm (single-thread). Default N = 5500.
+// verify N=100 vs golden/spectralnorm-output.txt
+// A(i,j) is inlined into the inner loop the way clang/rustc treat a
+// static/tiny eval_a. Scratch vector is allocated once.
+
+fn arg_n() int {
+    a := args()
+    if a.len > 1 {
+        mut n := 0
+        mut i := 0
+        s := a[1]
+        while i < s.len {
+            c := s[i] & 255
+            if c < 48 {
+                << 5500
+            }
+            if c > 57 {
+                << 5500
+            }
+            n = n * 10 + (c - 48)
+            i += 1
+        }
+        << n
+    }
+    << 5500
+}
+
+fn eval_a(i int, j int) int {
+    << (i + j) * (i + j + 1) / 2 + i + 1
+}
+
+fn times(v &mut []f64, u &[]f64) {
+    n := v.len
+    for i in 0:n {
+        mut s := 0.0
+        for j in 0:u.len {
+            s += u[j] / f64(eval_a(i, j))
+        }
+        v[i] = s
+    }
+}
+
+fn times_transp(v &mut []f64, u &[]f64) {
+    n := v.len
+    for i in 0:n {
+        mut s := 0.0
+        for j in 0:u.len {
+            ji := j + i
+            s += u[j] / f64(ji * (ji + 1) / 2 + j + 1)
+        }
+        v[i] = s
+    }
+}
+
+fn f9(x f64) string {
+    mut v := x
+    mut out := ""
+    if v < 0.0 {
+        out = "-"
+        v = 0.0 - v
+    }
+    mut whole := int(v)
+    mut frac := v - f64(whole)
+    mut digits := int(frac * 1000000000.0 + 0.5)
+    if digits >= 1000000000 {
+        whole += 1
+        digits = digits - 1000000000
+    }
+    out = out + str(whole) + "."
+    mut pow := 100000000
+    mut d := digits
+    while pow > 0 {
+        q := d / pow
+        out = out + str(q)
+        d = d - q * pow
+        pow = pow / 10
+    }
+    << out
+}
+
+fn main() int {
+    n := arg_n()
+    mut u := []f64{}
+    mut v := []f64{}
+    mut x := []f64{}
+    for i in 0:n {
+        u.push(1.0)
+        v.push(0.0)
+        x.push(0.0)
+    }
+    mut k := 0
+    while k < 10 {
+        times(mut &x, &u)
+        times_transp(mut &v, &x)
+        times(mut &x, &v)
+        times_transp(mut &u, &x)
+        k += 1
+    }
+    mut vbv := 0.0
+    mut vv := 0.0
+    for i in 0:n {
+        vbv += u[i] * v[i]
+        vv += v[i] * v[i]
+    }
+    println(f9(math.sqrt(vbv / vv)))
+    << 0
+}

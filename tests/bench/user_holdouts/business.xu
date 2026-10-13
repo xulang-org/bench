@@ -1,0 +1,21 @@
+@main
+struct Account { balance int count int }
+fn choose(x int) int {
+    if (x & 1) == 0 { << x * 3 + 7 }
+    << x * 5 - 11
+}
+fn ledger_loop(account &mut Account, n int) int {
+    mut i := 0
+    while i < n {
+        amount := choose(i & 255)
+        if (i & 3) == 0 { account.balance += amount } else { account.balance -= amount / 3 }
+        account.count += 1
+        i += 1
+    }
+    << account.balance + account.count
+}
+fn main() int {
+    mut account := Account{balance: 123, count: 0}
+    println(ledger_loop(mut &account, 200000))
+    << 0
+}

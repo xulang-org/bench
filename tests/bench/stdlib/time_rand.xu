@@ -1,0 +1,31 @@
+@main
+
+#time
+
+fn parse_sample(d string) int {
+    << time.parse_duration(&d) or (err) { << 0 }
+}
+
+fn main() int {
+    samples := ["1ns", "1us", "5ms", "1s", "2m", "1h2m3s500ms", "-3ms"]
+    mut total := 0
+    mut i := 0
+    while i < 8000 {
+        d := parse_sample(samples[i % samples.len])
+        t0 := time.now()
+        t1 := time.now()
+        total += t1 - t0
+        if time.since(t0) >= 0 {
+            total += 1
+        }
+        dur := time.format_duration(d)
+        total += dur.len
+        if i % 997 == 0 {
+            time.sleep(1)
+        }
+        total += d
+        i += 1
+    }
+    println(total)
+    << 0
+}

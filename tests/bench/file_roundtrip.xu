@@ -1,0 +1,41 @@
+@main
+
+#errors
+
+// File I/O throughput + read-back integrity. The payload is 512KiB and the
+// loop transfers 16MiB in each direction. bench_crosslang runs it in a private
+// directory, so this never writes into the checkout.
+fn main() int {
+    mut s := "A"
+    for i in 0:19 {
+        s = s + s
+    }
+    want := 524288
+
+    mut i := 0
+    mut sum := 0
+    mut got := ""
+    while i < 32 {
+        wrote := write_file("roundtrip.bin", s) or (err) {
+            println("write failed")
+            << 1
+        }
+        if wrote != want {
+            << 1
+        }
+        got = read_file("roundtrip.bin") or (err) {
+            println("read failed")
+            << 1
+        }
+        if got.len != want {
+            << 1
+        }
+        if got != s {
+            << 1
+        }
+        sum += got[0] + got[262144] + got[got.len - 1]
+        i += 1
+    }
+    println(sum)
+    << 0
+}

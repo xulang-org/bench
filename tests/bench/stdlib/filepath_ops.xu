@@ -1,0 +1,40 @@
+@main
+
+#path/filepath as fp
+
+fn main() int {
+    samples := ["/tmp/a/./b/../c", "/tmp/../tmp/dir/file.txt", "./alpha//beta/../gamma", "foo/bar/../baz/./qux", "C:\\Users\\xu\\..\\Temp\\", "a/b/c/../../d", "relative/path/segment.txt", "/", "a/b/../../../../c", "x/y/z", "x//y//./z//../a", "/tmp////multi////slash//path/"]
+
+    mut total := 0
+    mut i := 0
+    while i < 180000 {
+        p := samples[i % samples.len]
+        c := fp.clean(&p)
+        total += c.len
+        base := fp.base(&c)
+        total += base.len
+        d := fp.dir(&c)
+        total += d.len
+        e := fp.ext(&c)
+        total += e.len
+        s := fp.to_slash(&c)
+        total += s.len
+        u := fp.from_slash(&s)
+        total += u.len
+        if fp.is_abs(&c) {
+            total += 1
+        }
+        if fp.is_abs(&u) {
+            total += 1
+        }
+        parts := fp.split(&c)
+        if parts.len > 0 {
+            total += parts.len
+            total += parts[0].len
+        }
+        i += 1
+    }
+
+    println(total)
+    << 0
+}

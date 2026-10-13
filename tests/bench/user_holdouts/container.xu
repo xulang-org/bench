@@ -1,0 +1,21 @@
+@main
+fn choose(x int) int {
+    if (x & 1) == 0 { << x * 3 + 7 }
+    << x * 5 - 11
+}
+fn consume(values &[]int, rounds int) int {
+    mut sum := 0
+    mut i := 0
+    while i < rounds {
+        index := i % values.len
+        value := values[index]
+        sum += choose(value) + (i & 7)
+        i += 1
+    }
+    << sum
+}
+fn main() int {
+    values := [3, 8, 13, 21, 34, 55, 89, 144, 233]
+    println(consume(&values, 200000))
+    << 0
+}

@@ -1,0 +1,20 @@
+@main
+
+// Language map insert + lookup. Values are 1 (int-keyed grow);
+// checksum mixes key so the lookup is still in the sum.
+fn main() int {
+    mut m := map[int]int{}
+    mut i := 0
+    while i < 200000 {
+        m[i] = 1
+        i += 1
+    }
+    mut s := 0
+    i = 0
+    while i < 200000 {
+        s += m[i] + i
+        i += 1
+    }
+    println(s)
+    << 0
+}

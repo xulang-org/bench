@@ -1,0 +1,107 @@
+@main
+
+struct Deque {
+    pub buf []int
+    pub head int
+    pub tail int
+    pub count int
+    pub mask int
+}
+
+fn new_deque() Deque {
+    mut b := []int{}
+    mut i := 0
+    while i < 16 {
+        b.push(0)
+        i += 1
+    }
+    << Deque{buf: b, head: 0, tail: 0, count: 0, mask: 15}
+}
+
+fn (d &mut Deque) grow() {
+    old_cap := d.mask + 1
+    new_cap := old_cap * 2
+    mut new_buf := []int{}
+    mut i := 0
+    while i < new_cap {
+        new_buf.push(0)
+        i += 1
+    }
+    old_mask := d.mask
+    mut j := 0
+    while j < d.count {
+        new_buf[j] = d.buf[(d.head + j) & old_mask]
+        j += 1
+    }
+    d.buf = new_buf
+    d.head = 0
+    d.tail = d.count
+    d.mask = new_cap - 1
+}
+
+fn (d &mut Deque) push_back(val int) {
+    if d.count == d.mask + 1 {
+        d.grow()
+    }
+    d.buf[d.tail] = val
+    d.tail = (d.tail + 1) & d.mask
+    d.count += 1
+}
+
+fn (d &mut Deque) push_front(val int) {
+    if d.count == d.mask + 1 {
+        d.grow()
+    }
+    d.head = (d.head - 1) & d.mask
+    d.buf[d.head] = val
+    d.count += 1
+}
+
+fn (d &mut Deque) pop_front() int {
+    if d.count == 0 {
+        << 0
+    }
+    val := d.buf[d.head]
+    d.head = (d.head + 1) & d.mask
+    d.count -= 1
+    << val
+}
+
+fn (d &mut Deque) pop_back() int {
+    if d.count == 0 {
+        << 0
+    }
+    d.tail = (d.tail - 1) & d.mask
+    val := d.buf[d.tail]
+    d.count -= 1
+    << val
+}
+
+fn main() int {
+    mut q := new_deque()
+    mut seed := 123456789
+    mut checksum := 0
+    mut i := 0
+    while i < 5000000 {
+        seed = (seed * 1664525 + 1013904223) % 2147483647
+        op := seed % 4
+        if op == 0 {
+            q.push_back(seed)
+        } else if op == 1 {
+            q.push_front(seed)
+        } else if op == 2 {
+            v := q.pop_front()
+            checksum = (checksum * 33 + v) % 1000000007
+        } else {
+            v := q.pop_back()
+            checksum = (checksum * 33 + v) % 1000000007
+        }
+        i += 1
+    }
+    while q.count > 0 {
+        v := q.pop_front()
+        checksum = (checksum * 33 + v) % 1000000007
+    }
+    println(checksum)
+    << 0
+}

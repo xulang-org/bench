@@ -1,0 +1,172 @@
+@main
+
+#errors
+
+// Benchmarks Game fasta (single-thread). Default N = 2500000.
+// verify N=1000 vs golden/fasta-output.txt
+// Same LCG and Acid tables as cross/fasta.c. Output is a 64KiB chunk
+// buffer flushed with os_fd_write, matching FILE* / bufio — not one
+// giant string.
+
+const width = 60
+const im = 139968
+const ia = 3877
+const ic = 29573
+const buf_cap = 65536
+
+fn arg_n() int {
+    a := args()
+    if a.len > 1 {
+        mut n := 0
+        mut i := 0
+        s := a[1]
+        while i < s.len {
+            c := s[i] & 255
+            if c < 48 {
+                << 2500000
+            }
+            if c > 57 {
+                << 2500000
+            }
+            n = n * 10 + (c - 48)
+            i += 1
+        }
+        << n
+    }
+    << 2500000
+}
+
+fn min_i(a int, b int) int {
+    if a < b {
+        << a
+    }
+    << b
+}
+
+struct Out {
+    pub buf string
+}
+
+fn flush(o &mut Out) {
+    if o.buf.len == 0 {
+        <<
+    }
+    os_fd_write(1, o.buf) or (err) {
+        <<< 1
+    }
+    o.buf = ""
+}
+
+fn put_byte(o &mut Out, c int) {
+    r := mut &o.buf
+    r.push_byte(c & 255)
+    if o.buf.len >= buf_cap {
+        flush(o)
+    }
+}
+
+fn put_str(o &mut Out, s string) {
+    mut i := 0
+    while i < s.len {
+        put_byte(o, s[i])
+        i += 1
+    }
+}
+
+fn repeat_fasta(alu string, count0 int, o &mut Out) {
+    mut count := count0
+    mut pos := 0
+    alen := alu.len
+    while count > 0 {
+        line_n := min_i(width, count)
+        mut i := 0
+        while i < line_n {
+            put_byte(o, alu[pos])
+            pos += 1
+            if pos >= alen {
+                pos = 0
+            }
+            i += 1
+        }
+        put_byte(o, 10)
+        count -= line_n
+    }
+}
+
+struct Acid {
+    p f64
+    c int
+}
+
+fn accumulate(g &mut []Acid) {
+    mut i := 1
+    while i < g.len {
+        g[i].p = g[i].p + g[i - 1].p
+        i += 1
+    }
+}
+
+fn random_fasta(g &[]Acid, count0 int, seed0 int, o &mut Out) int {
+    mut seed := seed0
+    mut count := count0
+    glen := g.len
+    while count > 0 {
+        line_n := min_i(width, count)
+        mut j := 0
+        while j < line_n {
+            seed = (seed * ia + ic) % im
+            r := f64(seed) / f64(im)
+            mut k := 0
+            while k < glen {
+                if g[k].p >= r {
+                    put_byte(o, g[k].c)
+                    k = glen
+                } else {
+                    k += 1
+                }
+            }
+            j += 1
+        }
+        put_byte(o, 10)
+        count -= line_n
+    }
+    << seed
+}
+
+fn main() int {
+    n := arg_n()
+    alu := "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
+    mut iub := []Acid{}
+    iub.push(Acid{p: 0.27, c: 97})
+    iub.push(Acid{p: 0.12, c: 99})
+    iub.push(Acid{p: 0.12, c: 103})
+    iub.push(Acid{p: 0.27, c: 116})
+    iub.push(Acid{p: 0.02, c: 66})
+    iub.push(Acid{p: 0.02, c: 68})
+    iub.push(Acid{p: 0.02, c: 72})
+    iub.push(Acid{p: 0.02, c: 75})
+    iub.push(Acid{p: 0.02, c: 77})
+    iub.push(Acid{p: 0.02, c: 78})
+    iub.push(Acid{p: 0.02, c: 82})
+    iub.push(Acid{p: 0.02, c: 83})
+    iub.push(Acid{p: 0.02, c: 86})
+    iub.push(Acid{p: 0.02, c: 87})
+    iub.push(Acid{p: 0.02, c: 89})
+    mut hs := []Acid{}
+    hs.push(Acid{p: 0.3029549426680, c: 97})
+    hs.push(Acid{p: 0.1979883004921, c: 99})
+    hs.push(Acid{p: 0.1975473066391, c: 103})
+    hs.push(Acid{p: 0.3015094502008, c: 116})
+    accumulate(mut &iub)
+    accumulate(mut &hs)
+    mut seed := 42
+    mut o := Out{buf: ""}
+    put_str(mut &o, ">ONE Homo sapiens alu\n")
+    repeat_fasta(alu, 2 * n, mut &o)
+    put_str(mut &o, ">TWO IUB ambiguity codes\n")
+    seed = random_fasta(&iub, 3 * n, seed, mut &o)
+    put_str(mut &o, ">THREE Homo sapiens frequency\n")
+    seed = random_fasta(&hs, 5 * n, seed, mut &o)
+    flush(mut &o)
+    << 0
+}

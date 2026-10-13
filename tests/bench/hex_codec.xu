@@ -1,0 +1,23 @@
+@main
+
+#encoding/hex as hex
+#strings
+
+fn main() int {
+    base := "The quick brown fox jumps over the lazy dog 0123456789 ABCDEFGHIJKLMNOP"
+    payload := strings.repeat(&base, 8)
+    mut total := 0
+    mut i := 0
+    while i < 25000 {
+        enc := hex.encode_to_string(payload)
+        enc_len := enc.len
+        dec := hex.decode_string(enc) or (err) { << 1 }
+        total += enc_len + dec.len
+        if i == 0 {
+            total += dec[0] + dec[dec.len - 1]
+        }
+        i += 1
+    }
+    println(total)
+    << 0
+}

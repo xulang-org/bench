@@ -1,0 +1,22 @@
+{
+  "rows": [
+    {
+      "name": "parser",
+      "source": "tests/bench/user_holdouts/parser.xu",
+      "sha256": "9040c99222fd35c9fabf95935ca0e866afb68aae34c66509500240b2a5b62ee6",
+      "expected": "260800000\n"
+    },
+    {
+      "name": "business",
+      "source": "tests/bench/user_holdouts/business.xu",
+      "sha256": "b8c6e5e5bacbdb498e1e497183706c457019380ef78694d6095b69c5d225f3a8",
+      "expected": "-7981423\n"
+    },
+    {
+      "name": "container",
+      "source": "tests/bench/user_holdouts/container.xu",
+      "sha256": "4b2fc859b08cf16ceda3aaf262a93b26b3b4eae5212ba7c4e2deb0d301d47189",
+      "expected": "58099461\n"
+    }
+  ]
+}

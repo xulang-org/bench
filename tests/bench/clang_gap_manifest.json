@@ -1,0 +1,288 @@
+{
+  "schema": 1,
+  "purpose": "fixed Xu/Clang O3 capability suite; 22 micro and 6 Game quick",
+  "entries": [
+    {
+      "name": "algorithm_search",
+      "kind": "micro",
+      "xu_source": "tests/bench/algorithm_search.xu",
+      "c_source": "tests/bench/cross/algorithm_search.c",
+      "args": [],
+      "golden_sha256": "4631ee4a9f01a53c3505abf140b280b6bd573a67e10fac699c6b7d5e7724520d",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "array_ops",
+      "kind": "micro",
+      "xu_source": "tests/bench/array_ops.xu",
+      "c_source": "tests/bench/cross/array_ops.c",
+      "args": [],
+      "golden_sha256": "afcf854ca2f5dc9f92219522711c11559b597546972277cdf82a664e1b5bf31a",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "avl_tree",
+      "kind": "micro",
+      "xu_source": "tests/bench/avl_tree.xu",
+      "c_source": "tests/bench/cross/avl_tree.c",
+      "args": [],
+      "golden_sha256": "65de09d3d104455f39f458707862dd8d31156dcdb55bd8450f2f58ab2a1ab28a",
+      "golden_origin": "independent-reference"
+    },
+    {
+      "name": "chacha20_stream",
+      "kind": "micro",
+      "xu_source": "tests/bench/chacha20_stream.xu",
+      "c_source": "tests/bench/cross/chacha20_stream.c",
+      "args": [],
+      "golden_sha256": "5a68abb15d85e75ba617678f4895e3391dedc7151d15438b85ea071ecf52efe7",
+      "golden_origin": "independent-reference"
+    },
+    {
+      "name": "f64_sum",
+      "kind": "micro",
+      "xu_source": "tests/bench/f64_sum.xu",
+      "c_source": "tests/bench/cross/f64_sum.c",
+      "args": [],
+      "golden_sha256": "dbeaa4acabb5b0a0a2f210f36e5f2877e3dc246b91439a69f215f86bfb798161",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "fib",
+      "kind": "micro",
+      "xu_source": "tests/bench/fib.xu",
+      "c_source": "tests/bench/cross/fib.c",
+      "args": [],
+      "golden_sha256": "3e01be60139c8e55182a9388e0133537d417649b097c820c766aaf403dcdfc11",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "file_roundtrip",
+      "kind": "micro",
+      "xu_source": "tests/bench/file_roundtrip.xu",
+      "c_source": "tests/bench/cross/file_roundtrip.c",
+      "args": [],
+      "golden_sha256": "35e234381e46da19bd12dd9f089e0dfa873570730e7c3a4959b066f3b7380cc2",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "fn_val_sum",
+      "kind": "micro",
+      "xu_source": "tests/bench/fn_val_sum.xu",
+      "c_source": "tests/bench/cross/fn_val_sum.c",
+      "args": [],
+      "golden_sha256": "c26822b65f5e2776801a79f530d77a12db17d2b867799c9682bea6dbaa655eaf",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "huffman_coding",
+      "kind": "micro",
+      "xu_source": "tests/bench/huffman_coding.xu",
+      "c_source": "tests/bench/cross/huffman_coding.c",
+      "args": [],
+      "golden_sha256": "7073da2151a857867bc4fb63e44e0aa70d56537fef590e92e6de04f371be26f7",
+      "golden_origin": "independent-reference"
+    },
+    {
+      "name": "iface_sum",
+      "kind": "micro",
+      "xu_source": "tests/bench/iface_sum.xu",
+      "c_source": "tests/bench/cross/iface_sum.c",
+      "args": [],
+      "golden_sha256": "b1a303c5ee4984f061f96966da598bf505b2d9e48e77b6909ee2a64628d8edff",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "json_tokenizer",
+      "kind": "micro",
+      "xu_source": "tests/bench/json_tokenizer.xu",
+      "c_source": "tests/bench/cross/json_tokenizer.c",
+      "args": [],
+      "golden_sha256": "451cfd6520a6faa26512417d729dd7d64c3b79d4babfbd75179d05108b0e5356",
+      "golden_origin": "independent-reference"
+    },
+    {
+      "name": "loop_sum",
+      "kind": "micro",
+      "xu_source": "tests/bench/loop_sum.xu",
+      "c_source": "tests/bench/cross/loop_sum.c",
+      "args": [],
+      "golden_sha256": "3e9e4fa3e826100d6bb2c805bb025c95889b4b2e192b1acf221e290bfd5c84fc",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "map_ops",
+      "kind": "micro",
+      "xu_source": "tests/bench/map_ops.xu",
+      "c_source": "tests/bench/cross/map_ops.c",
+      "args": [],
+      "golden_sha256": "80318278668a65584b64df8779e86dd61957427ab38d04b4138cfd41ad19aeb6",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "match_sum",
+      "kind": "micro",
+      "xu_source": "tests/bench/match_sum.xu",
+      "c_source": "tests/bench/cross/match_sum.c",
+      "args": [],
+      "golden_sha256": "26d2ec35fe47fd86a6ee8fd194fa276f389dc2f10e77abb5d29c583f183d8a86",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "math_bits",
+      "kind": "micro",
+      "xu_source": "tests/bench/math_bits.xu",
+      "c_source": "tests/bench/cross/math_bits.c",
+      "args": [],
+      "golden_sha256": "d90971eaa50d69d37817550c471974b512946eaefed796954b5eba4dc6154009",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "matmul",
+      "kind": "micro",
+      "xu_source": "tests/bench/matmul.xu",
+      "c_source": "tests/bench/cross/matmul.c",
+      "args": [],
+      "golden_sha256": "7d5dc6c4f56532203a7274693b99f24d4026807eab6ae5db8b763e9d2a82eeb5",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "method_sum",
+      "kind": "micro",
+      "xu_source": "tests/bench/method_sum.xu",
+      "c_source": "tests/bench/cross/method_sum.c",
+      "args": [],
+      "golden_sha256": "e41c0c23fbacdb71dc71c9f8661bcd977ea9ca52bdfc2917c1584fe4a4432078",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "nested_loop",
+      "kind": "micro",
+      "xu_source": "tests/bench/nested_loop.xu",
+      "c_source": "tests/bench/cross/nested_loop.c",
+      "args": [],
+      "golden_sha256": "4bbc8ca0f6ae27c80cb8768fa4d33154145c280c96a402bc737f7e7eaf85d981",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "sha256_chain",
+      "kind": "micro",
+      "xu_source": "tests/bench/sha256_chain.xu",
+      "c_source": "tests/bench/cross/sha256_chain.c",
+      "args": [],
+      "golden_sha256": "e8ebc1a11968cdc4a7a6bb97727905b0ac17ce212d5c9e2f6557a1c394f901fd",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "sort_lcg",
+      "kind": "micro",
+      "xu_source": "tests/bench/sort_lcg.xu",
+      "c_source": "tests/bench/cross/sort_lcg.c",
+      "args": [],
+      "golden_sha256": "f503b4b9d8ede4704d98644d28975c29c5700d3a23c2dcc8c8c9a8d41e5cf9d7",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "startup",
+      "kind": "micro",
+      "xu_source": "tests/bench/startup.xu",
+      "c_source": "tests/bench/cross/startup.c",
+      "args": [],
+      "golden_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "string_build",
+      "kind": "micro",
+      "xu_source": "tests/bench/string_build.xu",
+      "c_source": "tests/bench/cross/string_build.c",
+      "args": [],
+      "golden_sha256": "60fd30a2c73ca8daba94fe253c476486bde7aa996b6abefd5cfba41e4f480b10",
+      "golden_origin": "bench_crosslang-locked"
+    },
+    {
+      "name": "game/nbody",
+      "kind": "game",
+      "xu_source": "tests/bench/game/nbody.xu",
+      "c_source": "tests/bench/game/cross/nbody.c",
+      "args": [
+        "500000"
+      ],
+      "verify_args": [
+        "1000"
+      ],
+      "verify_golden": "tests/bench/game/golden/nbody-output.txt",
+      "verify_golden_sha256": "76de83d6d51a74f82828547423f516e7815cfe8cfea6290a2831aa173f806de7"
+    },
+    {
+      "name": "game/fannkuchredux",
+      "kind": "game",
+      "xu_source": "tests/bench/game/fannkuchredux.xu",
+      "c_source": "tests/bench/game/cross/fannkuchredux.c",
+      "args": [
+        "10"
+      ],
+      "verify_args": [
+        "7"
+      ],
+      "verify_golden": "tests/bench/game/golden/fannkuchredux-output.txt",
+      "verify_golden_sha256": "2dc0a3cd4a547ba69389f97f3b447bd4d487fe6216c3cacd2f9bf8c908dc127f"
+    },
+    {
+      "name": "game/spectralnorm",
+      "kind": "game",
+      "xu_source": "tests/bench/game/spectralnorm.xu",
+      "c_source": "tests/bench/game/cross/spectralnorm.c",
+      "args": [
+        "500"
+      ],
+      "verify_args": [
+        "100"
+      ],
+      "verify_golden": "tests/bench/game/golden/spectralnorm-output.txt",
+      "verify_golden_sha256": "a95e11fa07f7b196ef488e73f67afbbbc16cf6a2c6de5f8d54ea49821fe604e6"
+    },
+    {
+      "name": "game/mandelbrot",
+      "kind": "game",
+      "xu_source": "tests/bench/game/mandelbrot.xu",
+      "c_source": "tests/bench/game/cross/mandelbrot.c",
+      "args": [
+        "1000"
+      ],
+      "verify_args": [
+        "200"
+      ],
+      "verify_golden": "tests/bench/game/golden/mandelbrot-output.txt",
+      "verify_golden_sha256": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+    },
+    {
+      "name": "game/fasta",
+      "kind": "game",
+      "xu_source": "tests/bench/game/fasta.xu",
+      "c_source": "tests/bench/game/cross/fasta.c",
+      "args": [
+        "250000"
+      ],
+      "verify_args": [
+        "1000"
+      ],
+      "verify_golden": "tests/bench/game/golden/fasta-output.txt",
+      "verify_golden_sha256": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73"
+    },
+    {
+      "name": "game/binarytrees",
+      "kind": "game",
+      "xu_source": "tests/bench/game/binarytrees.xu",
+      "c_source": "tests/bench/game/cross/binarytrees.c",
+      "args": [
+        "14"
+      ],
+      "verify_args": [
+        "10"
+      ],
+      "verify_golden": "tests/bench/game/golden/binarytrees-output.txt",
+      "verify_golden_sha256": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb"
+    }
+  ]
+}

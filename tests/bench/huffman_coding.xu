@@ -1,0 +1,245 @@
+@main
+
+struct HeapItem {
+    pub freq int
+    pub nid int
+}
+
+struct MinHeap {
+    pub items []HeapItem
+    pub size int
+}
+
+fn new_min_heap() MinHeap {
+    mut it := []HeapItem{}
+    mut i := 0
+    while i < 256 {
+        it.push(HeapItem{freq: 0, nid: 0})
+        i += 1
+    }
+    << MinHeap{items: it, size: 0}
+}
+
+fn heap_less(a &HeapItem, b &HeapItem) bool {
+    if a.freq != b.freq {
+        << a.freq < b.freq
+    }
+    << a.nid < b.nid
+}
+
+fn (h &mut MinHeap) push(freq int, nid int) {
+    mut i := h.size
+    h.size += 1
+    item := HeapItem{freq: freq, nid: nid}
+    while i > 0 {
+        p := (i - 1) / 2
+        if heap_less(&item, &h.items[p]) {
+            h.items[i] = h.items[p]
+            i = p
+        } else {
+            <-
+        }
+    }
+    h.items[i] = item
+}
+
+fn (h &mut MinHeap) pop() HeapItem {
+    top := h.items[0]
+    h.size -= 1
+    last := h.items[h.size]
+    if h.size == 0 {
+        << top
+    }
+    mut i := 0
+    while i * 2 + 1 < h.size {
+        left := i * 2 + 1
+        right := left + 1
+        mut best := left
+        if right < h.size && heap_less(&h.items[right], &h.items[left]) {
+            best = right
+        }
+        if heap_less(&h.items[best], &last) {
+            h.items[i] = h.items[best]
+            i = best
+        } else {
+            <-
+        }
+    }
+    h.items[i] = last
+    << top
+}
+
+struct HuffmanContext {
+    pub nodes_freq []int
+    pub nodes_ch []int
+    pub nodes_left []int
+    pub nodes_right []int
+    pub codes []int
+    pub code_lens []int
+}
+
+fn (ctx &mut HuffmanContext) get_codes(nid int, curr_code int, curr_len int) {
+    if ctx.nodes_left[nid] == -1 && ctx.nodes_right[nid] == -1 {
+        ch := ctx.nodes_ch[nid]
+        ctx.codes[ch] = curr_code
+        ctx.code_lens[ch] = curr_len
+        <<
+    }
+    ctx.get_codes(ctx.nodes_left[nid], (curr_code << 1) | 0, curr_len + 1)
+    ctx.get_codes(ctx.nodes_right[nid], (curr_code << 1) | 1, curr_len + 1)
+}
+
+fn isqrt(n int) int {
+    if n <= 0 {
+        << 0
+    }
+    mut x := n
+    mut y := (x + 1) / 2
+    while y < x {
+        x = y
+        y = (x + n / x) / 2
+    }
+    << x
+}
+
+fn main() int {
+    mut raw := []int{}
+    mut freqs := []int{}
+    mut i := 0
+    while i < 64 {
+        freqs.push(0)
+        i += 1
+    }
+
+    mut seed := 123456789
+    i = 0
+    while i < 20000 {
+        seed = (seed * 1103515245 + 12345) & 2147483647
+        c := isqrt(seed % 4096)
+        raw.push(c)
+        freqs[c] += 1
+        i += 1
+    }
+
+    mut nf := []int{}
+    mut nc := []int{}
+    mut nl := []int{}
+    mut nr := []int{}
+    mut cd := []int{}
+    mut cl := []int{}
+    i = 0
+    while i < 256 {
+        nf.push(0)
+        nc.push(0)
+        nl.push(-1)
+        nr.push(-1)
+        i += 1
+    }
+    i = 0
+    while i < 64 {
+        cd.push(0)
+        cl.push(0)
+        i += 1
+    }
+
+    mut ctx := HuffmanContext{
+        nodes_freq: nf,
+        nodes_ch: nc,
+        nodes_left: nl,
+        nodes_right: nr,
+        codes: cd,
+        code_lens: cl
+    }
+
+    mut node_count := 0
+    mut heap := new_min_heap()
+
+    mut ch := 0
+    while ch < 64 {
+        if freqs[ch] > 0 {
+            nid := node_count
+            node_count += 1
+            ctx.nodes_freq[nid] = freqs[ch]
+            ctx.nodes_ch[nid] = ch
+            ctx.nodes_left[nid] = -1
+            ctx.nodes_right[nid] = -1
+            heap.push(freqs[ch], nid)
+        }
+        ch += 1
+    }
+
+    while heap.size > 1 {
+        item1 := heap.pop()
+        item2 := heap.pop()
+        pid := node_count
+        node_count += 1
+        ctx.nodes_freq[pid] = item1.freq + item2.freq
+        ctx.nodes_ch[pid] = -1
+        ctx.nodes_left[pid] = item1.nid
+        ctx.nodes_right[pid] = item2.nid
+        heap.push(ctx.nodes_freq[pid], pid)
+    }
+
+    root := heap.pop().nid
+    ctx.get_codes(root, 0, 0)
+
+    // encode
+    mut bit_buf := []int{}
+    mut bit_count := 0
+    mut curr_word := 0
+    mut curr_bits := 0
+
+    i = 0
+    while i < 20000 {
+        b := raw[i]
+        c := ctx.codes[b]
+        l := ctx.code_lens[b]
+        mut bit_idx := l - 1
+        while bit_idx >= 0 {
+            bit := (c >> bit_idx) & 1
+            curr_word = (curr_word << 1) | bit
+            curr_bits += 1
+            if curr_bits == 32 {
+                bit_buf.push(curr_word)
+                curr_word = 0
+                curr_bits = 0
+            }
+            bit_count += 1
+            bit_idx -= 1
+        }
+        i += 1
+    }
+    if curr_bits > 0 {
+        curr_word = curr_word << (32 - curr_bits)
+        bit_buf.push(curr_word)
+    }
+
+    mut total_checksum := 0
+    mut round := 0
+    while round < 50 {
+        mut cur_node := root
+        mut decoded_sum := 0
+        mut bit_i := 0
+        while bit_i < bit_count {
+            word_idx := bit_i / 32
+            bit_pos := 31 - (bit_i % 32)
+            bit := (bit_buf[word_idx] >> bit_pos) & 1
+            if bit == 0 {
+                cur_node = ctx.nodes_left[cur_node]
+            } else {
+                cur_node = ctx.nodes_right[cur_node]
+            }
+            if ctx.nodes_left[cur_node] == -1 && ctx.nodes_right[cur_node] == -1 {
+                dec_ch := ctx.nodes_ch[cur_node]
+                decoded_sum = (decoded_sum * 33 + dec_ch) & 2147483647
+                cur_node = root
+            }
+            bit_i += 1
+        }
+        total_checksum = (total_checksum + decoded_sum) & 2147483647
+        round += 1
+    }
+
+    println(total_checksum)
+    << 0
+}

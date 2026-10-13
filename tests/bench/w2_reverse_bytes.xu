@@ -1,0 +1,17 @@
+@main
+
+#math/bits
+
+fn main() int {
+    mut x := 0x123456789abcdef0
+    mut sum := 0
+    mut i := 0
+    while i < 10000000 {
+        x = bits.reverse_bytes(x ^ i)
+        sum = sum ^ x
+        i += 1
+    }
+    println(str(x))
+    println(str(sum))
+    << 0
+}

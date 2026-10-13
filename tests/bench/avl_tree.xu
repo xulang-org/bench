@@ -1,0 +1,148 @@
+@main
+
+struct AVL {
+    pub keys []int
+    pub vals []int
+    pub heights []int
+    pub lefts []int
+    pub rights []int
+    pub count int
+    pub root int
+}
+
+fn new_avl(cap int) AVL {
+    mut k := []int{}
+    mut v := []int{}
+    mut h := []int{}
+    mut l := []int{}
+    mut r := []int{}
+    mut i := 0
+    while i < cap {
+        k.push(0)
+        v.push(0)
+        h.push(0)
+        l.push(-1)
+        r.push(-1)
+        i += 1
+    }
+    << AVL{keys: k, vals: v, heights: h, lefts: l, rights: r, count: 0, root: -1}
+}
+
+fn (t &AVL) get_h(idx int) int {
+    if idx == -1 {
+        << 0
+    }
+    << t.heights[idx]
+}
+
+fn (t &mut AVL) upd(idx int) {
+    hl := t.get_h(t.lefts[idx])
+    hr := t.get_h(t.rights[idx])
+    mut max_h := hr
+    if hl > hr {
+        max_h = hl
+    }
+    t.heights[idx] = 1 + max_h
+}
+
+fn (t &AVL) bf(idx int) int {
+    << t.get_h(t.lefts[idx]) - t.get_h(t.rights[idx])
+}
+
+fn (t &mut AVL) rot_r(y int) int {
+    x := t.lefts[y]
+    t2 := t.rights[x]
+    t.rights[x] = y
+    t.lefts[y] = t2
+    t.upd(y)
+    t.upd(x)
+    << x
+}
+
+fn (t &mut AVL) rot_l(x int) int {
+    y := t.rights[x]
+    t2 := t.lefts[y]
+    t.lefts[y] = x
+    t.rights[x] = t2
+    t.upd(x)
+    t.upd(y)
+    << y
+}
+
+fn (t &mut AVL) insert(idx int, key int, val int) int {
+    if idx == -1 {
+        nid := t.count
+        t.count += 1
+        t.keys[nid] = key
+        t.vals[nid] = val
+        t.heights[nid] = 1
+        t.lefts[nid] = -1
+        t.rights[nid] = -1
+        << nid
+    }
+    if key < t.keys[idx] {
+        t.lefts[idx] = t.insert(t.lefts[idx], key, val)
+    } else if key > t.keys[idx] {
+        t.rights[idx] = t.insert(t.rights[idx], key, val)
+    } else {
+        t.vals[idx] = val
+        << idx
+    }
+    t.upd(idx)
+    b := t.bf(idx)
+    if b > 1 && key < t.keys[t.lefts[idx]] {
+        << t.rot_r(idx)
+    }
+    if b < -1 && key > t.keys[t.rights[idx]] {
+        << t.rot_l(idx)
+    }
+    if b > 1 && key > t.keys[t.lefts[idx]] {
+        t.lefts[idx] = t.rot_l(t.lefts[idx])
+        << t.rot_r(idx)
+    }
+    if b < -1 && key < t.keys[t.rights[idx]] {
+        t.rights[idx] = t.rot_r(t.rights[idx])
+        << t.rot_l(idx)
+    }
+    << idx
+}
+
+fn (t &AVL) search(key int) int {
+    mut cur := t.root
+    while cur != -1 {
+        k := t.keys[cur]
+        if key == k {
+            << t.vals[cur]
+        } else if key < k {
+            cur = t.lefts[cur]
+        } else {
+            cur = t.rights[cur]
+        }
+    }
+    << 0
+}
+
+fn main() int {
+    mut t := new_avl(100000)
+    mut seed := 123456789
+    mut i := 0
+    while i < 80000 {
+        seed = (seed * 1103515245 + 12345) & 2147483647
+        k := seed % 200000
+        v := (i * 3 + 7) & 2147483647
+        t.root = t.insert(t.root, k, v)
+        i += 1
+    }
+
+    mut checksum := 0
+    i = 0
+    while i < 300000 {
+        seed = (seed * 1103515245 + 12345) & 2147483647
+        k := seed % 200000
+        val := t.search(k)
+        checksum = (checksum * 31 + val) % 1000000007
+        i += 1
+    }
+    println(checksum)
+    << 0
+}

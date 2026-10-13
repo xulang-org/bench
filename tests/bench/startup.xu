@@ -1,0 +1,6 @@
+@main
+
+// Whole-process launch baseline. Deliberately no stdout and no work.
+fn main() int {
+    << 0
+}

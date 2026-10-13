@@ -1,0 +1,40 @@
+@main
+
+// CRC-32 (IEEE 802.3) byte stream throughput.
+fn main() int {
+    n := 100000
+    mut data := []int{}
+    mut seed := 123456789
+    mut i := 0
+    while i < n {
+        seed = (seed * 1103515245 + 12345) & 2147483647
+        data.push(seed & 255)
+        i += 1
+    }
+    poly := 3988292384
+    mask32 := 4294967295
+    mut total := 0
+    mut round := 0
+    while round < 20 {
+        mut crc := mask32
+        mut k := 0
+        while k < n {
+            b := data[k]
+            crc = crc ^ b
+            mut bit := 0
+            while bit < 8 {
+                if (crc & 1) != 0 {
+                    crc = ((crc >> 1) & 2147483647) ^ poly
+                } else {
+                    crc = (crc >> 1) & 2147483647
+                }
+                bit += 1
+            }
+            k += 1
+        }
+        total += crc ^ mask32
+        round += 1
+    }
+    println(total)
+    << 0
+}

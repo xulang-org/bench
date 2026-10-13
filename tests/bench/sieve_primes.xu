@@ -1,0 +1,38 @@
+@main
+
+// Sieve of Eratosthenes: memory bandwidth + sequential indexed writes.
+fn main() int {
+    n := 2000000
+    mut is_prime := []int{}
+    mut i := 0
+    while i <= n {
+        is_prime.push(1)
+        i += 1
+    }
+    is_prime[0] = 0
+    is_prime[1] = 0
+    mut p := 2
+    while p * p <= n {
+        if is_prime[p] == 1 {
+            mut j := p * p
+            while j <= n {
+                is_prime[j] = 0
+                j += p
+            }
+        }
+        p += 1
+    }
+    mut count := 0
+    mut total := 0
+    mut k := 2
+    while k <= n {
+        if is_prime[k] == 1 {
+            count += 1
+            total += k
+        }
+        k += 1
+    }
+    println(count)
+    println(total)
+    << 0
+}

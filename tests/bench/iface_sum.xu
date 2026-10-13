@@ -1,0 +1,36 @@
+@main
+
+// Dynamic dispatch through struct@ (vs method_sum static calls).
+struct@ Src {
+    fn val() int
+}
+
+struct A {
+    x int
+}
+
+struct B {
+    x int
+}
+
+fn (a A) val() int {
+    << a.x
+}
+
+fn (b B) val() int {
+    << b.x * 2
+}
+
+fn main() int {
+    mut xs := []Src{}
+    xs.push(Src(A{x: 1}))
+    xs.push(Src(B{x: 2}))
+    mut s := 0
+    mut i := 0
+    while i < 8000000 {
+        s += xs[i & 1].val()
+        i += 1
+    }
+    println(s)
+    << 0
+}

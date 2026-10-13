@@ -1,0 +1,23 @@
+@main
+
+#encoding/base64 as b64
+#strings
+
+fn main() int {
+    base := "The quick brown fox jumps over the lazy dog 0123456789 ABCDEFGHIJKLMNOP"
+    payload := strings.repeat(&base, 6)
+    mut total := 0
+    mut i := 0
+    while i < 15000 {
+        enc := b64.encode_to_string(payload)
+        enc_len := enc.len
+        dec := b64.decode_string(enc) or (err) { << 1 }
+        total += enc_len + dec.len
+        if i == 0 {
+            total += dec[0] + dec[dec.len - 1]
+        }
+        i += 1
+    }
+    println(total)
+    << 0
+}

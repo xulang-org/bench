@@ -1,0 +1,29 @@
+@main
+
+#strings
+
+// Windowed index_byte + subsequence search on a 100k haystack.
+fn main() int {
+    mut s := ""
+    mut i := 0
+    while i < 10000 {
+        s.push_str("0123456789")
+        i += 1
+    }
+    v := strings.view_of(&s)
+    mut hits := 0
+    mut k := 0
+    while k < 20 {
+        if v.index_byte(&s, 57) >= 0 {
+            hits += 1
+        }
+        needle := "89012"
+        if v.index(&s, &needle) >= 0 {
+            hits += 1
+        }
+        k += 1
+    }
+    println(hits)
+    println(v.len)
+    << 0
+}

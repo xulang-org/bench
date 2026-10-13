@@ -1,0 +1,42 @@
+@main
+
+#container/heap as heap
+
+fn main() int {
+    mut h := heap.new_ints()
+    mut seed := 123456789
+    mut checksum := 0
+
+    // Phase 1: Push 200,000 elements
+    mut i := 0
+    while i < 200000 {
+        seed = (seed * 1664525 + 1013904223) % 2147483647
+        h.push(seed)
+        i += 1
+    }
+
+    // Phase 2: Pop 100,000 elements
+    i = 0
+    while i < 100000 {
+        v := h.pop() or (err) { << 1 }
+        checksum = (checksum * 31 + v) % 1000000007
+        i += 1
+    }
+
+    // Phase 3: Push 100,000 new elements
+    i = 0
+    while i < 100000 {
+        seed = (seed * 1664525 + 1013904223) % 2147483647
+        h.push(seed)
+        i += 1
+    }
+
+    // Phase 4: Pop remaining 200,000 elements
+    while h.n > 0 {
+        v := h.pop() or (err) { << 1 }
+        checksum = (checksum * 31 + v) % 1000000007
+    }
+
+    println(checksum)
+    << 0
+}

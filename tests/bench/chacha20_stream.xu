@@ -1,0 +1,77 @@
+@main
+
+struct ChaCha {
+    pub s []int
+}
+
+fn rotl32(v int, c int) int {
+    v32 := v & 4294967295
+    << ((v32 << c) & 4294967295) | (v32 >> (32 - c))
+}
+
+fn (cc &mut ChaCha) qr(a int, b int, c int, d int) {
+    cc.s[a] = (cc.s[a] + cc.s[b]) & 4294967295
+    cc.s[d] = rotl32(cc.s[d] ^ cc.s[a], 16)
+    cc.s[c] = (cc.s[c] + cc.s[d]) & 4294967295
+    cc.s[b] = rotl32(cc.s[b] ^ cc.s[c], 12)
+    cc.s[a] = (cc.s[a] + cc.s[b]) & 4294967295
+    cc.s[d] = rotl32(cc.s[d] ^ cc.s[a], 8)
+    cc.s[c] = (cc.s[c] + cc.s[d]) & 4294967295
+    cc.s[b] = rotl32(cc.s[b] ^ cc.s[c], 7)
+}
+
+fn main() int {
+    mut st := []int{}
+    mut i := 0
+    while i < 16 {
+        st.push(0)
+        i += 1
+    }
+    mut cc := ChaCha{s: st}
+
+    mut key := []int{}
+    i = 0
+    while i < 8 {
+        key.push((i * 16843009) & 4294967295)
+        i += 1
+    }
+    nonce0 := 305419896
+    nonce1 := 2596069104
+    nonce2 := 267246505
+
+    rounds := 30000
+    mut total_sum := 0
+    mut block := 0
+    while block < rounds {
+        cc.s[0] = 1634760805
+        cc.s[1] = 857760878
+        cc.s[2] = 2036477234
+        cc.s[3] = 1797285236
+        mut k := 0
+        while k < 8 {
+            cc.s[4 + k] = (key[k] + block) & 4294967295
+            k += 1
+        }
+        cc.s[12] = block & 4294967295
+        cc.s[13] = nonce0
+        cc.s[14] = nonce1
+        cc.s[15] = nonce2
+
+        mut r := 0
+        while r < 10 {
+            cc.qr(0, 4, 8, 12)
+            cc.qr(1, 5, 9, 13)
+            cc.qr(2, 6, 10, 14)
+            cc.qr(3, 7, 11, 15)
+            cc.qr(0, 5, 10, 15)
+            cc.qr(1, 6, 11, 12)
+            cc.qr(2, 7, 8, 13)
+            cc.qr(3, 4, 9, 14)
+            r += 1
+        }
+        total_sum = (total_sum + cc.s[0] + cc.s[5] + cc.s[10] + cc.s[15]) & 4294967295
+        block += 1
+    }
+    println(total_sum)
+    << 0
+}

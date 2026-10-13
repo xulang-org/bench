@@ -1,0 +1,14 @@
+@main
+
+// Recursive call + branch heavy: deep fib.
+fn fib(n int) int {
+    if n < 2 {
+        << n
+    }
+    << fib(n - 1) + fib(n - 2)
+}
+
+fn main() int {
+    println(fib(34))
+    << 0
+}

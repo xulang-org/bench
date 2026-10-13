@@ -1,0 +1,20 @@
+@main
+fn parse_sum(s &string) int {
+    mut total := 0
+    mut value := 0
+    for j in 0:s.len {
+        ch := s[j]
+        if ch >= 48 && ch <= 57 { value = value * 10 + ch - 48 } else {
+            total += value
+            value = 0
+        }
+    }
+    << total + value
+}
+fn main() int {
+    text := "17,205;3 91/402,8;77 501"
+    mut sum := 0
+    for j in 0:200000 { sum += parse_sum(&text) }
+    println(sum)
+    << 0
+}

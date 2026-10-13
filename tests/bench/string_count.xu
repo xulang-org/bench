@@ -1,0 +1,28 @@
+@main
+#strings
+fn main() int {
+    mut pool := []string{}
+    mut si := 0
+    while si < 32 {
+        n := 8 + si % 24
+        mut src := make_string(n)
+        mut j := 0
+        while j < n { src[j] = 97 + (j + si) % 3
+            j += 1 }
+        pool.push(src)
+        si += 1
+    }
+    mut state := 1
+    mut total := 0
+    mut i := 0
+    while i < 1000000 {
+        state = (state * 1103515245 + 12345) & 2147483647
+        idx := (state >> 16) & 31
+        mut needle := "a"
+        if ((state >> 8) & 1) == 1 { needle = "b" }
+        total += strings.count(&pool[idx], needle)
+        i += 1
+    }
+    println(total)
+    << 0
+}

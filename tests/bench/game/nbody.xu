@@ -1,0 +1,155 @@
+@main
+
+#math
+
+// Benchmarks Game n-body (single-thread). Default N = perf 5000000.
+// verify N=1000 vs golden/nbody-output.txt
+// Bodies are [5]Body on the frame, matching cross/nbody.rs / C sys[5].
+
+struct Body {
+    x f64
+    y f64
+    z f64
+    vx f64
+    vy f64
+    vz f64
+    mass f64
+}
+
+fn solar_mass() f64 {
+    p := math.pi()
+    << 4.0 * p * p
+}
+
+fn days_per_year() f64 {
+    << 365.24
+}
+
+fn arg_n() int {
+    a := args()
+    if a.len > 1 {
+        mut n := 0
+        mut i := 0
+        s := a[1]
+        while i < s.len {
+            c := s[i] & 255
+            if c < 48 {
+                << 5000000
+            }
+            if c > 57 {
+                << 5000000
+            }
+            n = n * 10 + (c - 48)
+            i += 1
+        }
+        << n
+    }
+    << 5000000
+}
+
+fn f9(x f64) string {
+    mut v := x
+    mut out := ""
+    if v < 0.0 {
+        out = "-"
+        v = 0.0 - v
+    }
+    mut whole := int(v)
+    mut frac := v - f64(whole)
+    mut digits := int(frac * 1000000000.0 + 0.5)
+    if digits >= 1000000000 {
+        whole += 1
+        digits = digits - 1000000000
+    }
+    out = out + str(whole) + "."
+    mut pow := 100000000
+    mut d := digits
+    while pow > 0 {
+        q := d / pow
+        out = out + str(q)
+        d = d - q * pow
+        pow = pow / 10
+    }
+    << out
+}
+
+fn energy(sys &[]Body) f64 {
+    mut e := 0.0
+    for i in 0:5 {
+        e += 0.5 * sys[i].mass * (sys[i].vx * sys[i].vx + sys[i].vy * sys[i].vy + sys[i].vz * sys[i].vz)
+        mut j := i + 1
+        while j < 5 {
+            dx := sys[i].x - sys[j].x
+            dy := sys[i].y - sys[j].y
+            dz := sys[i].z - sys[j].z
+            dist := math.sqrt(dx * dx + dy * dy + dz * dz)
+            e -= sys[i].mass * sys[j].mass / dist
+            j += 1
+        }
+    }
+    << e
+}
+
+fn offset_momentum(sys &mut []Body) {
+    mut px := 0.0
+    mut py := 0.0
+    mut pz := 0.0
+    for i in 0:5 {
+        px += sys[i].vx * sys[i].mass
+        py += sys[i].vy * sys[i].mass
+        pz += sys[i].vz * sys[i].mass
+    }
+    sm := solar_mass()
+    sys[0].vx = 0.0 - px / sm
+    sys[0].vy = 0.0 - py / sm
+    sys[0].vz = 0.0 - pz / sm
+}
+
+fn advance(sys &mut []Body, dt f64) {
+    for i in 0:5 {
+        mut j := i + 1
+        while j < 5 {
+            dx := sys[i].x - sys[j].x
+            dy := sys[i].y - sys[j].y
+            dz := sys[i].z - sys[j].z
+            d2 := dx * dx + dy * dy + dz * dz
+            dist := math.sqrt(d2)
+            mag := dt / (d2 * dist)
+            mj := sys[j].mass
+            mi := sys[i].mass
+            sys[i].vx -= dx * mj * mag
+            sys[i].vy -= dy * mj * mag
+            sys[i].vz -= dz * mj * mag
+            sys[j].vx += dx * mi * mag
+            sys[j].vy += dy * mi * mag
+            sys[j].vz += dz * mi * mag
+            j += 1
+        }
+    }
+    for i in 0:5 {
+        sys[i].x += dt * sys[i].vx
+        sys[i].y += dt * sys[i].vy
+        sys[i].z += dt * sys[i].vz
+    }
+}
+
+fn main() int {
+    n := arg_n()
+    sm := solar_mass()
+    dpy := days_per_year()
+    mut sys := []Body{}
+    sys.push(Body{x: 0.0, y: 0.0, z: 0.0, vx: 0.0, vy: 0.0, vz: 0.0, mass: sm})
+    sys.push(Body{x: 4.84143144246472090e+00, y: 0.0 - 1.16032004402742839e+00, z: 0.0 - 1.03622044471123109e-01, vx: 1.66007664274403694e-03 * dpy, vy: 7.69901118419740425e-03 * dpy, vz: 0.0 - 6.90460016972063023e-05 * dpy, mass: 9.54791938424326609e-04 * sm})
+    sys.push(Body{x: 8.34336671824457987e+00, y: 4.12479856412430479e+00, z: 0.0 - 4.03523417114321381e-01, vx: 0.0 - 2.76742510726862411e-03 * dpy, vy: 4.99852801234917238e-03 * dpy, vz: 2.30417297573763929e-05 * dpy, mass: 2.85885980666130812e-04 * sm})
+    sys.push(Body{x: 1.28943695621391310e+01, y: 0.0 - 1.51111514016986312e+01, z: 0.0 - 2.23307578892655734e-01, vx: 2.96460137564761618e-03 * dpy, vy: 2.37847173959480950e-03 * dpy, vz: 0.0 - 2.96589568540237556e-05 * dpy, mass: 4.36624404335156298e-05 * sm})
+    sys.push(Body{x: 1.53796971148509165e+01, y: 0.0 - 2.59193146099879641e+01, z: 1.79258772950371181e-01, vx: 2.68067772490389322e-03 * dpy, vy: 1.62824170038242295e-03 * dpy, vz: 0.0 - 9.51592254519715870e-05 * dpy, mass: 5.15138902046611451e-05 * sm})
+    offset_momentum(mut &sys)
+    println(f9(energy(&sys)))
+    mut i := 0
+    while i < n {
+        advance(mut &sys, 0.01)
+        i += 1
+    }
+    println(f9(energy(&sys)))
+    << 0
+}

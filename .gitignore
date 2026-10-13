@@ -1,0 +1,22 @@
+
+# Local records and generated artifacts
+/docs/
+/reports/
+/notes/
+/tmp/
+/build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+*.xin
+*.exe
+*.o
+*.a
+*.bin
+*.log
+*.provenance
+*.curves/
+.env
+.env.*
+!.env.example

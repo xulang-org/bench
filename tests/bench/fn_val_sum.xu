@@ -1,0 +1,18 @@
+@main
+
+// Named function as fn-value; indirect call in a counted loop.
+fn bump(x int) int {
+    << x + 1
+}
+
+fn main() int {
+    f := bump
+    mut s := 0
+    mut i := 0
+    while i < 8000000 {
+        s += f(i & 7)
+        i += 1
+    }
+    println(s)
+    << 0
+}

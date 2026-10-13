@@ -1,0 +1,24 @@
+@main
+
+#strings
+
+// Builder write_byte growth + ByteView scan. Checksum must stay stable.
+fn main() int {
+    mut b := strings.builder()
+    mut i := 0
+    while i < 100000 {
+        b.write_byte(48 + (i % 10))
+        i += 1
+    }
+    t := b.text()
+    v := strings.view_of(&t)
+    mut c := 0
+    mut j := 0
+    while j < v.len {
+        c += v.at(&t, j)
+        j += 1
+    }
+    println(c)
+    println(v.len)
+    << 0
+}

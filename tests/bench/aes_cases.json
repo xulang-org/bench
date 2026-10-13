@@ -1,0 +1,87 @@
+{
+  "oracle": {
+    "cryptography": "46.0.5",
+    "openssl": "OpenSSL 3.5.5 27 Jan 2026"
+  },
+  "standard": "https://csrc.nist.gov/pubs/fips/197/final",
+  "key_schedule_vectors": [
+    [
+      "2b7e151628aed2a6abf7158809cf4f3c",
+      "d014f9a8c9ee2589e13f0cc8b6630ca6"
+    ],
+    [
+      "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
+      "e98ba06f448c773c8ecc720401002202"
+    ],
+    [
+      "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
+      "fe4890d1e6188d0b046df344706c631e"
+    ]
+  ],
+  "algorithm_sha256": "e3dd56322307e21fd128007aef74b02b01fe9a426356b143d88f3106b9a5aa5d",
+  "rows": [
+    {
+      "name": "aes128_encrypt",
+      "bits": 128,
+      "operation": "encrypt",
+      "iterations": 100000,
+      "expect": "8a2a156f9b87fd7576be4a13c3e41c5d\n"
+    },
+    {
+      "name": "aes128_decrypt",
+      "bits": 128,
+      "operation": "decrypt",
+      "iterations": 100000,
+      "expect": "11f9740af24d70e78f50b5b407664176\n"
+    },
+    {
+      "name": "aes128_key_setup",
+      "bits": 128,
+      "operation": "key_setup",
+      "iterations": 10000,
+      "expect": "1087987\n"
+    },
+    {
+      "name": "aes192_encrypt",
+      "bits": 192,
+      "operation": "encrypt",
+      "iterations": 100000,
+      "expect": "027a490ebdb3ccf2dd1057d638e293c2\n"
+    },
+    {
+      "name": "aes192_decrypt",
+      "bits": 192,
+      "operation": "decrypt",
+      "iterations": 100000,
+      "expect": "6ed8119f2abe0dc846d74d24cc426801\n"
+    },
+    {
+      "name": "aes192_key_setup",
+      "bits": 192,
+      "operation": "key_setup",
+      "iterations": 10000,
+      "expect": "1319771\n"
+    },
+    {
+      "name": "aes256_encrypt",
+      "bits": 256,
+      "operation": "encrypt",
+      "iterations": 100000,
+      "expect": "05e02782a54c19f76b3397c6e5855a6c\n"
+    },
+    {
+      "name": "aes256_decrypt",
+      "bits": 256,
+      "operation": "decrypt",
+      "iterations": 100000,
+      "expect": "4b1a2e40a8a6ad8761b3a6fca8719ee5\n"
+    },
+    {
+      "name": "aes256_key_setup",
+      "bits": 256,
+      "operation": "key_setup",
+      "iterations": 10000,
+      "expect": "1033425\n"
+    }
+  ]
+}
