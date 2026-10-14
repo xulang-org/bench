@@ -19,21 +19,49 @@ on:
         description: 'Specific benchmarks to run (comma-separated, empty for all in mode)'
         required: false
         default: ''
+      xu_ref:
+        description: 'Xu commit or ref to rebuild and benchmark'
+        required: false
+        default: 'main'
+      seed_version:
+        description: 'Published SDK seed tag; empty selects the latest published SDK'
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 env:
   PYTHONIOENCODING: utf-8
+  XU_CI_LANE: product
+  XU_BOUNDARY_CI: '1'
 
 concurrency:
   group: bench-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  resolve-xu:
+    name: Resolve the Xu commit once for every platform
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Resolve the requested Xu ref
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          XU_REF: ${{ github.event.inputs.xu_ref || 'main' }}
+        run: |
+          SHA=$(gh api "repos/xulang-org/xu/commits/$XU_REF" --jq .sha)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Xu source commit: $SHA"
+
   benchmark:
+    needs: resolve-xu
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
@@ -115,6 +143,7 @@ jobs:
         with:
           repository: xulang-org/xu
           path: xu
+          ref: ${{ needs.resolve-xu.outputs.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -135,42 +164,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang llvm
 
-      - name: Install / Resolve Xu compiler
+      - name: Rebuild the selected Xu commit from a published hosted seed
         env:
           GH_TOKEN: ${{ github.token }}
+          XU_SDK_SEED_VERSION: ${{ github.event.inputs.seed_version }}
+          XU_BENCH_TARGET: ${{ matrix.target }}
         run: |
-          mkdir -p ../xu/bin /tmp/xu-sdk
-          XU_VER=$(tr -d '[:space:]' < ../xu/VERSION)
-          TAG="v$XU_VER"
-          echo "Targeting exact Xu SDK tag: $TAG, pattern: ${{ matrix.pattern }}"
-          gh release download "$TAG" --repo xulang-org/xu --pattern "${{ matrix.pattern }}" --dir /tmp/xu-sdk || \
-          gh release download --repo xulang-org/xu --pattern "${{ matrix.pattern }}" --dir /tmp/xu-sdk || true
-          
-          if [ "${{ matrix.archive_type }}" = "tar" ]; then
-            if ls /tmp/xu-sdk/*.tar.gz 1> /dev/null 2>&1; then
-              tar -xzf /tmp/xu-sdk/*.tar.gz -C /tmp/xu-sdk/
-              SDK_DIR=$(find /tmp/xu-sdk -mindepth 1 -maxdepth 1 -type d | head -n 1)
-              cp -r "$SDK_DIR"/bin/* ../xu/bin/ || true
-              chmod +x ../xu/bin/xu || true
-            fi
-          else
-            if ls /tmp/xu-sdk/*.zip 1> /dev/null 2>&1; then
-              unzip -q -o /tmp/xu-sdk/*.zip -d /tmp/xu-sdk/unpacked
-              SDK_DIR=$(find /tmp/xu-sdk/unpacked -mindepth 1 -maxdepth 1 -type d | head -n 1)
-              cp -r "$SDK_DIR"/bin/* ../xu/bin/ || true
-            fi
-          fi
-
-          if [ ! -f ../xu/bin/xu ] && [ ! -f ../xu/bin/xu.exe ]; then
-            echo "Compiler not found from download, attempting build from source..."
-            cd ../xu && make build && cd - || true
-          fi
-
-          XU_BIN="../xu/bin/xu"
-          if [ -f "../xu/bin/xu.exe" ]; then
-            XU_BIN="../xu/bin/xu.exe"
-          fi
+          EXE=xu
+          if [[ "$XU_BENCH_TARGET" == windows-* ]]; then EXE=xu.exe; fi
+          mkdir -p reports ../bench-compiler
+          cd ../xu
+          python3 scripts/restore_product_seed.py --target "$XU_BENCH_TARGET" --destination "bin/$EXE"
+          XU_SKIP_CROSS=1 scripts/build_hosted_chain.sh --candidate-only "bin/$EXE" "../bench-compiler/$EXE"
+          python3 scripts/check_release_identity.py --xu "../bench-compiler/$EXE" --require-cli
+          python3 scripts/check_bootstrap_xu_boundary.py --ci --strict-freeze --json > ../bench-compiler/source-boundary.json
+          CLOSURE=$(python3 -c 'import json; print(json.load(open("../bench-compiler/source-boundary.json"))["source_manifest"]["closure_sha256"])')
+          python3 scripts/verify_product_provenance.py "../bench-compiler/$EXE" --source-closure-sha256 "$CLOSURE"
+          cd ../bench
+          XU_BIN="../bench-compiler/$EXE"
+          echo "XU_BIN=$XU_BIN" >> "$GITHUB_ENV"
           "$XU_BIN" --version
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          target = os.environ['XU_BENCH_TARGET']
+          compiler = Path('../bench-compiler') / ('xu.exe' if target.startswith('windows-') else 'xu')
+          provenance = dict(line.split('=', 1) for line in Path(str(compiler) + '.provenance').read_text().splitlines() if '=' in line)
+          identity = {
+              'xu_commit': subprocess.check_output(['git', '-C', '../xu', 'rev-parse', 'HEAD'], text=True).strip(),
+              'bench_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'xu_version': Path('../xu/VERSION').read_text().strip(),
+              'target': target,
+              'compiler_sha256': hashlib.sha256(compiler.read_bytes()).hexdigest(),
+              'source_closure_sha256': provenance['source_closure_sha256'],
+              'seed_sha256': provenance['seed_sha256'],
+              'fixed_point_pair': provenance['fixed_point_pair'],
+          }
+          Path('reports/compiler-identity.json').write_text(json.dumps(identity, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(identity, indent=2))
+          PY
 
       - name: Run cross-language benchmarks
         run: |
@@ -184,15 +216,11 @@ jobs:
             BENCH_FLAG="--quick --benches=startup,loop_sum,fib,nested_loop,method_sum,f64_sum,matmul,string_build,sroa_vec3,copy_bytes,chan_ping,sha256_chain,aes128_encrypt"
           fi
           echo "Running cross-language benchmark with mode: $MODE $BENCH_FLAG"
-          python3 scripts/bench_crosslang.py --out reports/crosslang.txt $BENCH_FLAG
+          python3 scripts/bench_crosslang.py --xu "$XU_BIN" --out reports/crosslang.txt $BENCH_FLAG
 
       - name: Format summary & JSON payload
         run: |
-          XU_BIN="../xu/bin/xu"
-          if [ -f "../xu/bin/xu.exe" ]; then
-            XU_BIN="../xu/bin/xu.exe"
-          fi
-          VERSION=$("$XU_BIN" --version 2>/dev/null | awk '{print $2}' || echo "0.8.8")
+          VERSION=$(tr -d '[:space:]' < ../xu/VERSION)
           python3 scripts/format_summary.py \
             -i reports/crosslang.txt \
             -j "reports/benchmarks-${{ matrix.platform_id }}.json" \
@@ -217,6 +245,7 @@ jobs:
             bench/reports/crosslang.txt
             bench/reports/benchmarks-${{ matrix.platform_id }}.json
             bench/reports/github_summary.md
+            bench/reports/compiler-identity.json
 
   aggregate:
     name: Aggregate Multi-Arch Results
