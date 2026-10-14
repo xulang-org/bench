@@ -187,6 +187,7 @@ class Bench:
 
 
 CORE = ("go", "c", "rs", "swift")
+APPLE_CRYPTO = CORE if sys.platform == "darwin" else ("go", "c", "rs")
 
 BENCHES: list[Bench] = [
     Bench("startup", "", "进程启动/空 main", CORE),
@@ -215,7 +216,7 @@ BENCHES: list[Bench] = [
         CORE,
         xu_opt_matrix=True,
     ),
-    Bench("sha256_chain", "131ea75bef251e81744c71ecb216e3d799e00c26c52677d19c9d026d6b6fa5aa\n", "哈希计算", CORE),
+    Bench("sha256_chain", "131ea75bef251e81744c71ecb216e3d799e00c26c52677d19c9d026d6b6fa5aa\n", "哈希计算", APPLE_CRYPTO),
     Bench(
         "chan_ping",
         "124999750000\n",
@@ -240,7 +241,7 @@ BENCHES: list[Bench] = [
     Bench("hex_codec", "42600164\n", "十六进制编解码(2.5万次查表流)", CORE),
     Bench("base64_codec", "14910164\n", "Base64编解码(1.5万次协议流)", CORE),
     Bench("ring_buffer", "855584727\n", "双端环形缓冲区(500万次动态扩容)", CORE),
-    Bench("md5_chain", "f0bab2b4771e3638b3c031a6e0a5ca52\n", "MD5链式消息摘要(10万轮散列)", CORE),
+    Bench("md5_chain", "f0bab2b4771e3638b3c031a6e0a5ca52\n", "MD5链式消息摘要(10万轮散列)", APPLE_CRYPTO),
     Bench("quicksort_hoare", "895282358\n", "Hoare双指针快速排序(50万元素递归分区)", CORE),
     Bench("lru_cache", "455153392\n", "LRU缓存机制(250万次Get/Put与链表淘汰)", CORE),
     Bench("bloom_filter", "175597838\n", "布隆过滤器(100万位位图与200万次查验)", CORE),
