@@ -736,7 +736,9 @@ def main():
         if name == XU_BASE:
             xu_base_s[bench] = st.med_s
         exp = BY_NAME[bench].expect
-        ok = "OK" if st.stdout == exp else f"MISMATCH {st.stdout!r}"
+        actual_stdout = st.stdout.replace("\r\n", "\n")
+        expected_stdout = exp.replace("\r\n", "\n")
+        ok = "OK" if actual_stdout == expected_stdout else f"MISMATCH {st.stdout!r}"
         if ok != "OK":
             fail_mismatch = True
         best_ms = st.best_s * 1000
