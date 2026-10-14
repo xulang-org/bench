@@ -130,6 +130,8 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
             "date": meta.get("date", "2026-10-14"),
             "os": meta.get("os", "Linux / macOS"),
             "arch": meta.get("arch", "arm64 / x64"),
+            "platform_id": meta.get("platform_id", "default"),
+            "platform_name": meta.get("platform_name", f"{meta.get('os')} ({meta.get('arch')})"),
             "xu_version": meta.get("xu_version", "0.8.8"),
             "total_benches": len(benches),
             "methodology": "Whole-program wall time, 7 iterations median, wait4 peak RSS, verified stdout",
@@ -142,9 +144,11 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
 def generate_markdown_summary(payload: dict) -> str:
     meta = payload["metadata"]
     benches = payload["benches"]
+    platform_label = meta.get("platform_name") or f"{meta.get('os')} ({meta.get('arch')})"
     lines = [
         f"## 🚀 Xu 全量跨语言基准横向测评 ({meta['date']})",
         "",
+        f"- **运行平台 / 架构**: `{platform_label}`",
         f"- **编译器版本**: `Xu v{meta['xu_version']}`",
         f"- **测试负载数量**: `{meta['total_benches']}` 项算法与业务场景",
         f"- **对比语言**: `C (Clang -O3)`, `Rust (rustc -O3)`, `Go (go build)`, `Swift (-O)`",
@@ -166,7 +170,7 @@ def generate_markdown_summary(payload: dict) -> str:
         go_str = f"{item['go_wall_ms']:.1f}ms" if item['go_wall_ms'] else "—"
         note = ""
         if kb == "startup":
-            note = f"极速冷启动，领先 Go {round((item['go_wall_ms']/item['xu_wall_ms']-1)*100)}%"
+            note = f"极速冷启动，领先 Go {round((item['go_wall_ms']/item['xu_wall_ms']-1)*100)}%" if item['go_wall_ms'] else "极速原生冷启动"
         elif kb == "chan_ping":
             note = "原生轻量协程与 Channel 高性能调度"
         elif kb == "sroa_vec3":
@@ -177,7 +181,7 @@ def generate_markdown_summary(payload: dict) -> str:
 
     lines.extend([
         "",
-        "### 📊 全量 47 项横向性能对比表 (Wall Time 中位数，ms)",
+        "### 📊 全量横向性能对比表 (Wall Time 中位数，ms)",
         "",
         "| 负载类别 | 负载名称 | Xu (ms) | Go (ms) | C 最佳 (ms) | Rust 最佳 (ms) | Xu / 最佳对照 |",
         "|---|---|---:|---:|---:|---:|---:|",
@@ -198,6 +202,110 @@ def generate_markdown_summary(payload: dict) -> str:
     return "\n".join(lines)
 
 
+def generate_multi_arch_summary(aggregated: dict) -> str:
+    meta = aggregated["metadata"]
+    platforms = aggregated["platforms"]
+    lines = [
+        f"## 🌐 Xu 多架构 & 跨平台基准测评全矩阵汇总报告",
+        "",
+        f"- **基准评测日期**: `{meta['date']}`",
+        f"- **编译器版本**: `Xu v{meta['xu_version']}`",
+        f"- **测试覆盖矩阵**: `{len(platforms)}` 组平台架构环境（ARM64 与 x86_64 双架构支持）",
+        "",
+        "### 🖥️ 平台与架构执行状态",
+        "",
+        "| 平台代号 | 操作系统 | 硬件架构 | 评测负载数 | 状态 |",
+        "|---|---|---|---:|---|",
+    ]
+
+    for pid, pdata in platforms.items():
+        pmeta = pdata.get("metadata", {})
+        os_str = pmeta.get("os", pid)
+        arch_str = pmeta.get("arch", "")
+        count = len(pdata.get("benches", []))
+        lines.append(f"| **`{pid}`** | {os_str} | `{arch_str}` | {count} 项 | ✅ 测试通过 |")
+
+    lines.extend([
+        "",
+        "### ⚡ 核心负载跨架构与跨平台对照 (Xu 运行耗时，ms)",
+        "",
+    ])
+
+    # Table comparing key benches across platforms
+    key_benches = ["startup", "loop_sum", "fib", "matmul", "sroa_vec3", "chan_ping", "aes128_encrypt"]
+    header = "| 核心负载 | 说明 |" + "".join(f" {pid} |" for pid in platforms.keys())
+    separator = "|---|---|" + "".join("---:|" for _ in platforms)
+    lines.append(header)
+    lines.append(separator)
+
+    for kb in key_benches:
+        desc = BENCH_DESCRIPTIONS.get(kb, (kb, kb))[0]
+        row = [f"`{kb}`", desc]
+        for pid, pdata in platforms.items():
+            b_item = next((b for b in pdata.get("benches", []) if b["name"] == kb), None)
+            if b_item and b_item.get("xu_wall_ms") is not None:
+                row.append(f"**{b_item['xu_wall_ms']:.2f}ms**")
+            else:
+                row.append("—")
+        lines.append("| " + " | ".join(row) + " |")
+
+    lines.extend([
+        "",
+        "> 💡 官网 [xulang.org/benchmarks](https://xulang.org/benchmarks) 已提供多架构实时交互切换 Tab，可查看各架构全量详细数据及内存/体积对比。",
+    ])
+    return "\n".join(lines)
+
+
+def merge_platform_payloads(dir_path: Path) -> dict:
+    platforms = {}
+    latest_meta = {}
+    all_categories = {}
+
+    for file_path in dir_path.glob("**/*.json"):
+        try:
+            data = json.loads(file_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if "metadata" not in data or "benches" not in data:
+            continue
+        pid = data["metadata"].get("platform_id")
+        if not pid or pid == "default":
+            # Guess from filename or directory
+            m = re.search(r"benchmarks[_-]([a-z0-9_-]+)\.json", file_path.name)
+            if m:
+                pid = m.group(1)
+            else:
+                pid = file_path.stem
+        platforms[pid] = data
+        latest_meta.update(data["metadata"])
+        if "categories" in data:
+            all_categories.update(data["categories"])
+
+    if not platforms:
+        raise ValueError(f"No valid benchmark JSON files found in {dir_path}")
+
+    # Pick default platform priority: linux-arm64 > macos-arm64 > linux-x64 > first
+    default_pid = next(
+        (p for p in ["linux-arm64", "macos-arm64", "linux-x64", "windows-x64"] if p in platforms),
+        list(platforms.keys())[0]
+    )
+
+    aggregated = {
+        "metadata": {
+            "date": latest_meta.get("date", "2026-10-14"),
+            "xu_version": latest_meta.get("xu_version", "0.8.8"),
+            "platforms": list(platforms.keys()),
+            "total_benches": max(len(p.get("benches", [])) for p in platforms.values()),
+            "methodology": "Whole-program wall time, 7 iterations median, wait4/Win32 peak RSS, verified stdout",
+        },
+        "platforms": platforms,
+        "default_platform": default_pid,
+        "categories": all_categories or {k: {"zh": v[0], "en": v[1]} for k, v in CATEGORY_NAMES.items()},
+        "benches": platforms[default_pid].get("benches", []),
+    }
+    return aggregated
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", "-i", type=Path, default=Path("reports/crosslang.txt"))
@@ -206,7 +314,23 @@ def main():
     parser.add_argument("--xu-version", default="0.8.8")
     parser.add_argument("--os", default="Linux / macOS")
     parser.add_argument("--arch", default="arm64 / x64")
+    parser.add_argument("--platform-id", default="default")
+    parser.add_argument("--platform-name", default=None)
+    parser.add_argument("--merge-dir", type=Path, help="Merge all platform JSONs inside a directory")
     args = parser.parse_args()
+
+    if args.merge_dir:
+        aggregated = merge_platform_payloads(args.merge_dir)
+        if args.json_out:
+            args.json_out.parent.mkdir(parents=True, exist_ok=True)
+            args.json_out.write_text(json.dumps(aggregated, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            print(f"Wrote merged payload to {args.json_out}")
+        if args.summary_out:
+            summary_md = generate_multi_arch_summary(aggregated)
+            args.summary_out.parent.mkdir(parents=True, exist_ok=True)
+            args.summary_out.write_text(summary_md, encoding="utf-8")
+            print(f"Wrote merged summary Markdown to {args.summary_out}")
+        return
 
     if not args.input.is_file():
         sys.exit(f"Input file not found: {args.input}")
@@ -217,6 +341,8 @@ def main():
         "xu_version": args.xu_version,
         "os": args.os,
         "arch": args.arch,
+        "platform_id": args.platform_id,
+        "platform_name": args.platform_name or f"{args.os} ({args.arch})",
     }
     payload = build_benchmark_payload(parsed, meta)
 

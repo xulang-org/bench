@@ -44,11 +44,85 @@ def _maxrss_to_bytes(ru_maxrss: int) -> int:
 
 
 def _status_rc(status: int) -> int:
-    if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
-    if os.WIFSIGNALED(status):
-        return -os.WTERMSIG(status)
-    return -1
+    if hasattr(os, "WIFEXITED"):
+        if os.WIFEXITED(status):
+            return os.WEXITSTATUS(status)
+        if os.WIFSIGNALED(status):
+            return -os.WTERMSIG(status)
+        return -1
+    return status
+
+
+@dataclass
+class _Win32Rusage:
+    ru_maxrss: int = 0
+    ru_utime: float = 0.0
+    ru_stime: float = 0.0
+
+
+def _run_one_win32(
+    p: subprocess.Popen,
+    timeout_s: float | None = None,
+) -> tuple[int, _Win32Rusage]:
+    try:
+        p.wait(timeout=timeout_s)
+        rc = p.returncode
+    except subprocess.TimeoutExpired:
+        try:
+            p.kill()
+        except OSError:
+            pass
+        p.wait()
+        rc = -9
+
+    peak_bytes = 0
+    user_s = 0.0
+    sys_s = 0.0
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        handle = int(p._handle)
+
+        class FILETIME(ctypes.Structure):
+            _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
+
+        def _ft_to_s(ft: FILETIME) -> float:
+            val = (ft.dwHighDateTime << 32) | ft.dwLowDateTime
+            return val / 10_000_000.0
+
+        c_time, e_time, k_time, u_time = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+        if ctypes.windll.kernel32.GetProcessTimes(
+            handle, ctypes.byref(c_time), ctypes.byref(e_time), ctypes.byref(k_time), ctypes.byref(u_time)
+        ):
+            sys_s = _ft_to_s(k_time)
+            user_s = _ft_to_s(u_time)
+
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        pmc = PROCESS_MEMORY_COUNTERS()
+        pmc.cb = ctypes.sizeof(pmc)
+        fn = getattr(ctypes.windll.psapi, "GetProcessMemoryInfo", None) or getattr(
+            ctypes.windll.kernel32, "K32GetProcessMemoryInfo", None
+        )
+        if fn and fn(handle, ctypes.byref(pmc), pmc.cb):
+            peak_bytes = int(pmc.PeakWorkingSetSize)
+    except Exception:
+        pass
+
+    return rc, _Win32Rusage(ru_maxrss=peak_bytes, ru_utime=user_s, ru_stime=sys_s)
 
 
 # --- live RSS readers -------------------------------------------------------
@@ -151,7 +225,7 @@ def run_one(
 ) -> RunSample:
     """Run cmd; optionally sample live RSS every sample_interval_s seconds.
 
-    sample_interval_s=None → no live curve (peak still from wait4).
+    sample_interval_s=None → no live curve (peak still from wait4/Win32).
     timeout_s: kill the child (returncode -9) if it runs longer than this.
     """
     with tempfile.SpooledTemporaryFile(max_size=4 * 1024 * 1024) as out_f, tempfile.SpooledTemporaryFile(
@@ -164,7 +238,9 @@ def run_one(
         ru = None
         sample = sample_interval_s is not None and sample_interval_s > 0
         limit = timeout_s is not None and timeout_s > 0
-        if not sample:
+        if sys.platform == "win32" or not hasattr(os, "wait4"):
+            status, ru = _run_one_win32(p, timeout_s=timeout_s)
+        elif not sample:
             # Blocking wait4. A WNOHANG + 50ms sleep quantized every short
             # O2/O3/--no-regcache run to ~56ms wall while CPU was 7–25ms.
             killer = None

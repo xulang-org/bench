@@ -36,9 +36,21 @@ from bench_rusage import (  # noqa: E402
 )
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
-ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
+xu_env = os.environ.get("XU_ROOT")
+if xu_env and (Path(xu_env) / "scripts").is_dir():
+    ROOT = Path(xu_env).expanduser().resolve()
+elif (BENCH_ROOT.parent / "xu").is_dir():
+    ROOT = (BENCH_ROOT.parent / "xu").resolve()
+else:
+    ROOT = Path(xu_env or BENCH_ROOT.parent / "xu").expanduser().resolve()
+
 sys.path.insert(0, str(ROOT / "scripts"))
-from companion_repos import project_root
+try:
+    from companion_repos import project_root
+except ImportError:
+    def project_root(name: str, core_root: Path | None = None) -> Path:
+        base = core_root or ROOT
+        return base / name
 CROSS = BENCH_ROOT / "tests" / "bench" / "cross"
 PRODUCT_XU = ROOT / "bin" / "xu"
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
@@ -119,44 +131,48 @@ def _is_primer(path: Path, resolved: Path | None = None) -> bool:
 def resolve_product_compiler(explicit: str | None) -> Path:
     """Resolve a hosted compiler without a product→primer fallback."""
 
-    if not PRODUCT_RUNNER.is_file() or not os.access(PRODUCT_RUNNER, os.X_OK):
-        raise SystemExit(f"missing product compiler wrapper: {PRODUCT_RUNNER}")
-
     raw: Path | None = None
     if explicit:
         raw = Path(explicit).expanduser()
         compiler = raw.resolve()
     else:
-        if not HOST_SEED_RESOLVER.is_file():
-            raise SystemExit(
-                "missing hosted seed resolver; run make xu or pass --xu=/path/to/bin/xu"
+        # Check standard bin path first
+        candidate = ROOT / "bin" / ("xu.exe" if sys.platform == "win32" else "xu")
+        if candidate.is_file():
+            compiler = candidate.resolve()
+        elif sys.platform != "win32" and HOST_SEED_RESOLVER.is_file():
+            env = os.environ.copy()
+            env["XU_ALLOW_ORACLE_SEED"] = ORACLE_SEED_OFF.split("=", 1)[1]
+            env.pop("XU_SEED", None)
+            probe = subprocess.run(
+                [str(HOST_SEED_RESOLVER)],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
             )
-        env = os.environ.copy()
-        env["XU_ALLOW_ORACLE_SEED"] = ORACLE_SEED_OFF.split("=", 1)[1]
-        env.pop("XU_SEED", None)
-        probe = subprocess.run(
-            [str(HOST_SEED_RESOLVER)],
-            cwd=ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if probe.returncode != 0:
+            if probe.returncode != 0:
+                raise SystemExit(
+                    "hosted product compiler missing; run make xu or pass --xu=/path/to/bin/xu"
+                )
+            lines = [line.strip() for line in probe.stdout.splitlines() if line.strip()]
+            if len(lines) != 1:
+                raise SystemExit("hosted seed resolver returned invalid output")
+            compiler = Path(lines[0]).expanduser().resolve()
+        else:
             raise SystemExit(
                 "hosted product compiler missing; run make xu or pass --xu=/path/to/bin/xu"
             )
-        lines = [line.strip() for line in probe.stdout.splitlines() if line.strip()]
-        if len(lines) != 1:
-            raise SystemExit("hosted seed resolver returned invalid output")
-        compiler = Path(lines[0]).expanduser().resolve()
 
     if _is_primer(raw if raw is not None else compiler, compiler):
         raise SystemExit(
             "bootstrap primer is oracle-only; use an oracle diagnostic suite "
             "instead of bench_crosslang"
         )
-    if not compiler.is_file() or not os.access(compiler, os.X_OK):
+    if not compiler.is_file():
+        raise SystemExit(f"hosted product compiler does not exist: {compiler}")
+    if sys.platform != "win32" and not os.access(compiler, os.X_OK):
         raise SystemExit(f"hosted product compiler is not executable: {compiler}")
     return compiler
 
@@ -259,8 +275,18 @@ BENCHES: list[Bench] = [
 BY_NAME = {b.name: b for b in BENCHES}
 
 
+class _CmdResult:
+    def __init__(self, stdout: str = "", stderr: str = "", returncode: int = 0):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
 def run(cmd, **kw):
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    except Exception as e:
+        return _CmdResult(stdout="", stderr=str(e), returncode=1)
 
 
 def timed_runs(
@@ -461,7 +487,15 @@ def main():
     xu_compiler = resolve_product_xu(args.xu)
 
     selected = parse_benches(args.benches)
-    host_machine = run(["uname", "-m"]).stdout.strip()
+    import platform
+    raw_machine = platform.machine().lower()
+    if raw_machine in ("arm64", "aarch64"):
+        host_machine = "arm64"
+    elif raw_machine in ("x86_64", "amd64"):
+        host_machine = "x86_64"
+    else:
+        host_machine = raw_machine
+
     if args.xu_target == "macos-arm64" and host_machine != "arm64":
         raise SystemExit("macos-arm64 benchmark execution requires an arm64 host")
     if args.xu_target == "macos-x64" and host_machine not in ("arm64", "x86_64"):
@@ -493,7 +527,7 @@ def main():
         print(s, flush=True)
         lines.append(s)
 
-    host = run(["uname", "-sm"]).stdout.strip()
+    host = f"{platform.system()} {platform.machine()}"
     log(f"# host: {host}")
     log(f"# date: {time.strftime('%Y-%m-%d %H:%M')}")
     log(f"# lane: {LANE}")
@@ -546,16 +580,22 @@ def main():
     log("")
 
     jobs: list[tuple[str, str, list[str], Path]] = []
+    ext = ".exe" if sys.platform == "win32" else ""
 
     def add(name, bench, cmd, out_bin):
         jobs.append((name, bench, cmd, out_bin))
 
     def xu_compile_argv(src: Path, flags: list[str], out: Path) -> list[str]:
-        # Product: `run_product_compiler.sh hosted-xu build in.xu -o out`.
-        # The wrapper makes benchmark compilation use the same clean source,
-        # cache, target, and oracle environment as every other product
-        # consumer.  The Rust primer has a separate diagnostic lane and is
-        # intentionally rejected by resolve_product_compiler().
+        if sys.platform == "win32" or not PRODUCT_RUNNER.is_file():
+            return [
+                str(xu_compiler),
+                "build",
+                str(src),
+                *xu_target_flags,
+                *flags,
+                "-o",
+                str(out),
+            ]
         return [
             str(PRODUCT_RUNNER),
             str(xu_compiler),
@@ -568,7 +608,7 @@ def main():
         ]
 
     def add_xu(bench: Bench, flags: list[str], label: str, tag: str):
-        out = tmp / f"xu_{bench.name}_{tag}"
+        out = tmp / f"xu_{bench.name}_{tag}{ext}"
         add(label, bench.name, xu_compile_argv(xu_src(bench.name), flags, out), out)
 
     for bench in selected:
@@ -578,7 +618,7 @@ def main():
 
         langs = bench.langs
         if "go" in langs and tools["go"] and not cross_arch:
-            out = tmp / f"go_{bench.name}"
+            out = tmp / f"go_{bench.name}{ext}"
             add(
                 "go build",
                 bench.name,
@@ -588,7 +628,7 @@ def main():
         if "c" in langs and tools["clang"]:
             src = cross_src(bench.name, "c")
             if args.full or (want_debug_peers and bench.xu_opt_matrix):
-                out0 = tmp / f"c_{bench.name}_o0"
+                out0 = tmp / f"c_{bench.name}_o0{ext}"
                 add(
                     "clang -O0",
                     bench.name,
@@ -596,7 +636,7 @@ def main():
                     out0,
                 )
             for _level, label, flags, tag in C_LEVELS:
-                out = tmp / f"c_{bench.name}_{tag}"
+                out = tmp / f"c_{bench.name}_{tag}{ext}"
                 add(
                     label,
                     bench.name,
@@ -606,7 +646,7 @@ def main():
         if "rs" in langs and tools["rustc"] and not cross_arch:
             src = cross_src(bench.name, "rs")
             if args.full or (want_debug_peers and bench.xu_opt_matrix):
-                out0 = tmp / f"rs_{bench.name}_o0"
+                out0 = tmp / f"rs_{bench.name}_o0{ext}"
                 add(
                     "rustc -O0",
                     bench.name,
@@ -614,7 +654,7 @@ def main():
                     out0,
                 )
             for _level, label, flags, tag in RUST_LEVELS:
-                out = tmp / f"rs_{bench.name}_{tag}"
+                out = tmp / f"rs_{bench.name}_{tag}{ext}"
                 add(
                     label,
                     bench.name,
@@ -624,14 +664,14 @@ def main():
         if "swift" in langs and tools["swiftc"] and not cross_arch:
             src = cross_src(bench.name, "swift")
             if args.full or (want_debug_peers and bench.xu_opt_matrix):
-                out0 = tmp / f"sw_{bench.name}_none"
+                out0 = tmp / f"sw_{bench.name}_none{ext}"
                 add(
                     "swiftc -Onone",
                     bench.name,
                     ["swiftc", *swift_cache_flags, "-Onone", "-o", str(out0), *peer_sources(bench.name, "swift")],
                     out0,
                 )
-            outo = tmp / f"sw_{bench.name}_o"
+            outo = tmp / f"sw_{bench.name}_o{ext}"
             add("swiftc -O", bench.name, ["swiftc", *swift_cache_flags, "-O", "-o", str(outo), *peer_sources(bench.name, "swift")], outo)
 
     log("## runtime + resources + binary size")
