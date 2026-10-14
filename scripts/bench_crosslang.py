@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import shutil
 import subprocess
@@ -26,6 +27,12 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "buffer"):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "buffer"):
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_rusage import (  # noqa: E402
@@ -550,7 +557,7 @@ def main():
         log("# curves: disabled (--sample-ms=0)")
     else:
         log(
-            f"# curves: live RSS every {args.sample_ms:g}ms → {curves_dir}"
+            f"# curves: live RSS every {args.sample_ms:g}ms -> {curves_dir}"
         )
     log(
         "# method: plb2-style whole-program wall; same algorithm (not peak golf); "
