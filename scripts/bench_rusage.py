@@ -328,7 +328,7 @@ def write_curve_csv(path: Path, curve: list[tuple[float, float]] | tuple[tuple[f
     lines = ["t_ms,rss_mib"]
     for t, r in curve:
         lines.append(f"{t * 1000:.3f},{r:.4f}")
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_rss_svg(
@@ -345,7 +345,8 @@ def write_rss_svg(
     if not clean:
         path.write_text(
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
-            f'<text x="20" y="40">no RSS samples for {escape(title)}</text></svg>\n'
+            f'<text x="20" y="40">no RSS samples for {escape(title)}</text></svg>\n',
+            encoding="utf-8",
         )
         return
 
@@ -418,7 +419,7 @@ def write_rss_svg(
         )
 
     parts.append("</svg>")
-    path.write_text("\n".join(parts) + "\n")
+    path.write_text("\n".join(parts) + "\n", encoding="utf-8")
 
 
 def sparkline(curve: list[tuple[float, float]] | tuple[tuple[float, float], ...], width: int = 24) -> str:

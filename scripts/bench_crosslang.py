@@ -954,7 +954,7 @@ def main():
         log(f"# curves dir: {curves_dir}")
 
     text = "\n".join(lines) + "\n"
-    Path(args.out).write_text(text)
+    Path(args.out).write_text(text, encoding="utf-8")
     log(f"\n# wrote {args.out}")
     log(f"# bins in {tmp}")
     if fail_mismatch:
