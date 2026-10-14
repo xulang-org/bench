@@ -30,15 +30,20 @@ concurrency:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bench
     steps:
       - name: Checkout bench suite
         uses: actions/checkout@v6
+        with:
+          path: bench
 
       - name: Checkout Xu compiler
         uses: actions/checkout@v6
         with:
           repository: xulang-org/xu
-          path: ../xu
+          path: xu
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -112,6 +117,6 @@ jobs:
         with:
           name: benchmark-reports
           path: |
-            reports/crosslang.txt
-            reports/benchmarks.json
-            reports/github_summary.md
+            bench/reports/crosslang.txt
+            bench/reports/benchmarks.json
+            bench/reports/github_summary.md
