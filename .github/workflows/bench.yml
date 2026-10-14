@@ -68,7 +68,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p ../xu/bin /tmp/xu-sdk
-          echo "Downloading latest official Linux x64 Xu SDK..."
+          XU_VER=$(tr -d '[:space:]' < ../xu/VERSION)
+          TAG="v$XU_VER"
+          echo "Targeting exact Xu SDK tag: $TAG"
+          gh release download "$TAG" --repo xulang-org/xu --pattern "*linux-x64*.tar.gz" --dir /tmp/xu-sdk || \
           gh release download --repo xulang-org/xu --pattern "*linux-x64*.tar.gz" --dir /tmp/xu-sdk || true
           if ls /tmp/xu-sdk/*.tar.gz 1> /dev/null 2>&1; then
             tar -xzf /tmp/xu-sdk/*.tar.gz -C /tmp/xu-sdk/
@@ -85,12 +88,13 @@ jobs:
       - name: Run cross-language benchmarks
         run: |
           mkdir -p reports
-          MODE="${{ github.event.inputs.mode || 'quick' }}"
+          INPUT_MODE="${{ github.event.inputs.mode }}"
+          MODE="${INPUT_MODE:-quick}"
           BENCH_FLAG=""
           if [ -n "${{ github.event.inputs.benches }}" ]; then
             BENCH_FLAG="--benches=${{ github.event.inputs.benches }}"
           elif [ "$MODE" = "quick" ]; then
-            BENCH_FLAG="--benches=startup,loop_sum,fib,nested_loop,method_sum,f64_sum,matmul,string_build,sroa_vec3,copy_bytes,chan_ping,sha256_chain,aes128_encrypt"
+            BENCH_FLAG="--quick --benches=startup,loop_sum,fib,nested_loop,method_sum,f64_sum,matmul,string_build,sroa_vec3,copy_bytes,chan_ping,sha256_chain,aes128_encrypt"
           fi
           echo "Running cross-language benchmark with mode: $MODE $BENCH_FLAG"
           python3 scripts/bench_crosslang.py --out reports/crosslang.txt $BENCH_FLAG
