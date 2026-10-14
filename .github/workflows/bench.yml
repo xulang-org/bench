@@ -200,6 +200,11 @@ jobs:
               'seed_sha256': provenance['seed_sha256'],
               'fixed_point_pair': provenance['fixed_point_pair'],
           }
+          # Windows invokes the compiler directly; its staged executable is
+          # outside an SDK bin/src layout, so supply the selected source root.
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as environment:
+              environment.write(f"XU_ROOT={Path('../xu').resolve().as_posix()}\n")
+              environment.write(f"XU_STDLIB_ROOT={Path('../xu/src').resolve().as_posix()}\n")
           Path('reports/compiler-identity.json').write_text(json.dumps(identity, indent=2) + '\n', encoding='utf-8')
           print(json.dumps(identity, indent=2))
           PY
