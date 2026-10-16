@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import json
 import re
 import sys
@@ -127,14 +128,15 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
 
     return {
         "metadata": {
-            "date": meta.get("date", "2026-10-14"),
+            "date": meta.get("date", date.today().isoformat()),
             "os": meta.get("os", "Linux / macOS"),
             "arch": meta.get("arch", "arm64 / x64"),
             "platform_id": meta.get("platform_id", "default"),
             "platform_name": meta.get("platform_name", f"{meta.get('os')} ({meta.get('arch')})"),
             "xu_version": meta.get("xu_version", "0.8.8"),
             "total_benches": len(benches),
-            "methodology": "Whole-program wall time, 7 iterations median, wait4 peak RSS, verified stdout",
+            "rss_method": meta.get("rss_method", "unrecorded"),
+            "methodology": "Whole-program wall time, 7 iterations median; Linux RSS from separate post-exec tracing, macOS wait4, Windows peak working set; verified stdout",
         },
         "categories": {k: {"zh": v[0], "en": v[1]} for k, v in CATEGORY_NAMES.items()},
         "benches": benches,
@@ -292,11 +294,11 @@ def merge_platform_payloads(dir_path: Path) -> dict:
 
     aggregated = {
         "metadata": {
-            "date": latest_meta.get("date", "2026-10-14"),
+            "date": latest_meta.get("date", date.today().isoformat()),
             "xu_version": latest_meta.get("xu_version", "0.8.8"),
             "platforms": list(platforms.keys()),
             "total_benches": max(len(p.get("benches", [])) for p in platforms.values()),
-            "methodology": "Whole-program wall time, 7 iterations median, wait4/Win32 peak RSS, verified stdout",
+            "methodology": "Whole-program wall time, 7 iterations median; per-platform RSS method recorded separately, Linux RSS from untimed post-exec tracing; verified stdout",
         },
         "platforms": platforms,
         "default_platform": default_pid,
@@ -338,6 +340,8 @@ def main():
     content = args.input.read_text(encoding="utf-8")
     parsed = parse_crosslang_txt(content)
     meta = {
+        "rss_method": (re.search(r"^# rss_method: (.+)$", content, re.M).group(1)
+                       if re.search(r"^# rss_method: (.+)$", content, re.M) else "unrecorded"),
         "xu_version": args.xu_version,
         "os": args.os,
         "arch": args.arch,

@@ -20,3 +20,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Machine-local agent instructions
+/AGENTS.md

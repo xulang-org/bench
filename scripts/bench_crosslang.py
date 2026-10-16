@@ -36,6 +36,7 @@ if sys.platform == "win32":
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_rusage import (  # noqa: E402
+    peak_rss_method,
     run_one,
     sparkline,
     write_curve_csv,
@@ -316,7 +317,7 @@ def timed_runs(
     total = n + (1 if discard_first else 0)
     for i in range(total):
         s = run_one(
-            [path], sample_interval_s=None, timeout_s=timeout_s, cwd=cwd
+            [path], sample_interval_s=None, timeout_s=timeout_s, cwd=cwd, verify_rss_output=True
         )
         if timeout_s is not None and s.wall_s >= timeout_s and s.returncode != 0:
             raise SystemExit(f"TIMEOUT {path}: {s.wall_s:.1f}s >= {timeout_s:.1f}s")
@@ -335,6 +336,7 @@ def timed_runs(
         cs = run_one(
             [path],
             sample_interval_s=sample_interval_s,
+            verify_rss_output=True,
             timeout_s=timeout_s,
             cwd=cwd,
         )
@@ -562,8 +564,9 @@ def main():
     log(
         "# method: plb2-style whole-program wall; same algorithm (not peak golf); "
         "AOT no warmup; startup is an intentional short-process cell; "
-        "RSS peak=wait4 ru_maxrss; curve=live poll (libproc|/proc|ps)"
+        "RSS collected separately on Linux; curve=live poll (libproc|/proc|ps)"
     )
+    log(f"# rss_method: {peak_rss_method()}")
     log(
         "# suite: language-capability (same algorithm; int=i64; while-counted)"
     )

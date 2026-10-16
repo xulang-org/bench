@@ -1,11 +1,14 @@
 """Child-process wall time + rusage + live RSS curve sampling.
 
-Peak RSS via wait4(ru_maxrss): macOS/BSD = bytes; Linux = KiB → bytes.
+Linux RSS is measured in a separate traced exec, never in the timed run.
+macOS/BSD peak RSS uses wait4; Windows uses PeakWorkingSetSize.
 Live curve: poll RSS while the child runs (libproc /proc or ps fallback).
 """
 from __future__ import annotations
 
 import os
+import functools
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +17,49 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
+
+
+def peak_rss_method() -> str:
+    if sys.platform.startswith("linux"):
+        return "linux-post-exec-vmhwm-v1"
+    if sys.platform == "win32":
+        return "win32-peak-working-set"
+    return "wait4-native"
+
+
+@functools.lru_cache(maxsize=1)
+def _linux_rss_helper():
+    compiler = shutil.which("cc") or shutil.which("clang") or shutil.which("gcc")
+    if not compiler:
+        raise RuntimeError("Linux peak RSS requires a C compiler for the native measurement helper")
+    directory = tempfile.TemporaryDirectory(prefix="xu-bench-rss-")
+    binary = Path(directory.name) / "rss"
+    build = subprocess.run([compiler, "-std=c11", "-O2", "-Wall", "-Wextra",
+                            str(Path(__file__).with_name("bench_rss_linux.c")), "-o", str(binary)],
+                           capture_output=True)
+    if build.returncode:
+        raise RuntimeError("Linux RSS helper build failed: " + build.stderr.decode("utf-8", "replace"))
+    return binary, directory  # Keep the temporary directory alive with the cached helper.
+
+
+def _linux_peak_rss(cmd, cwd, timeout_s, stdout, stderr, returncode, verify_output):
+    helper, _directory = _linux_rss_helper()
+    with tempfile.TemporaryDirectory(prefix="xu-bench-rss-run-") as directory:
+        report = Path(directory) / "rss.txt"
+        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            measured = subprocess.run([str(helper), str(report), *cmd], stdout=out, stderr=err,
+                                      cwd=cwd, timeout=timeout_s + 1 if timeout_s else None)
+            out.seek(0)
+            err.seek(0)
+            measured_out, measured_err = out.read(), err.read()
+        if measured.returncode or not report.is_file():
+            raise RuntimeError("Linux RSS measurement failed: " + measured_err.decode("utf-8", "replace")[-1000:])
+        peak, measured_rc = map(int, report.read_text().split())
+        if measured_rc != returncode or (verify_output and (measured_out, measured_err) != (stdout, stderr)):
+            raise RuntimeError("Linux RSS rerun output or exit status differs from the timed run")
+        if peak <= 0:
+            raise RuntimeError("Linux RSS measurement is unavailable")
+        return peak
 
 
 @dataclass(frozen=True)
@@ -222,10 +268,13 @@ def run_one(
     sample_interval_s: float | None = None,
     timeout_s: float | None = None,
     cwd: str | Path | None = None,
+    verify_rss_output: bool = False,
 ) -> RunSample:
     """Run cmd; optionally sample live RSS every sample_interval_s seconds.
 
-    sample_interval_s=None → no live curve (peak still from wait4/Win32).
+    Linux runs cmd again to collect post-exec RSS; tracing and compilation
+    overhead are excluded from wall/CPU. verify_rss_output checks that rerun.
+    sample_interval_s=None → no live curve.
     timeout_s: kill the child (returncode -9) if it runs longer than this.
     """
     with tempfile.SpooledTemporaryFile(max_size=4 * 1024 * 1024) as out_f, tempfile.SpooledTemporaryFile(
@@ -285,7 +334,16 @@ def run_one(
         err = err_f.read()
 
     assert ru is not None
+    rc = _status_rc(status)
+    p.returncode = rc  # wait4 already reaped the process.
     peak = _maxrss_to_bytes(ru.ru_maxrss)
+    if sys.platform.startswith("linux"):
+        peak = 0 if rc == -9 and limit else _linux_peak_rss(
+            cmd, cwd, timeout_s, out, err, rc, verify_rss_output)
+        # The curve belongs to the timed process, not to the RSS-only rerun.
+        # Do not fabricate points from a different execution's peak.
+        return RunSample(wall, peak, float(ru.ru_utime), float(ru.ru_stime),
+                         out, err, rc, tuple(curve))
     # Ensure curve ends at wall with peak (so SVG shows true max even if poll missed it)
     if curve:
         last_t, last_r = curve[-1]
