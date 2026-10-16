@@ -26,7 +26,8 @@ python3 -m pytest tests scripts/test_bench_game.py
 
 ## 测量口径
 
-跨语言测试默认预跑一次，再取七次独立进程运行的中位数；核对 stdout
+跨语言测试默认取七次独立进程运行的中位数；可用 `--discard-first`
+额外执行并丢弃一次预跑。核对 stdout
 后才接受结果。wall time 和 CPU time 来自直接执行的进程。
 
 Linux 的 `wait4.ru_maxrss` 会保留启动器在 exec 前的内存峰值，不能直接
