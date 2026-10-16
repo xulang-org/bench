@@ -10,11 +10,11 @@ on:
       mode:
         description: 'Benchmark mode: quick or full'
         required: true
-        default: 'quick'
+        default: 'full'
         type: choice
         options:
-          - quick
           - full
+          - quick
       benches:
         description: 'Specific benchmarks to run (comma-separated, empty for all in mode)'
         required: false
@@ -213,7 +213,7 @@ jobs:
         run: |
           mkdir -p reports
           INPUT_MODE="${{ github.event.inputs.mode }}"
-          MODE="${INPUT_MODE:-quick}"
+          MODE="${INPUT_MODE:-full}"
           BENCH_FLAG=""
           if [ -n "${{ github.event.inputs.benches }}" ]; then
             BENCH_FLAG="--benches=${{ github.event.inputs.benches }}"
