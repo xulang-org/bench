@@ -94,15 +94,23 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
         xu = implementations.get("Xu")
         if not xu:
             continue
-        c_opt = implementations.get("clang -O3") or implementations.get("clang -O2") or implementations.get("clang -O1")
-        rust_opt = implementations.get("rustc -O3") or implementations.get("rustc -O2") or implementations.get("rustc -O1")
+        def select_best_opt(prefix):
+            choices = [implementations[name] for name in (f"{prefix} -O{i}" for i in (1, 2, 3))
+                       if name in implementations and isinstance(implementations[name].get("wall_ms"), (int, float))
+                       and implementations[name]["wall_ms"] > 0]
+            return min(choices, key=lambda impl: impl["wall_ms"]) if choices else None
+
+        c_opt = select_best_opt("clang")
+        rust_opt = select_best_opt("rustc")
         go_opt = implementations.get("go build")
         swift_opt = implementations.get("swiftc -O")
 
         desc_zh, desc_en, category = BENCH_DESCRIPTIONS.get(name, (name, name, "algo"))
 
         def calc_ratio(peer):
-            if not peer or peer["wall_ms"] <= 0:
+            if not peer or not isinstance(peer.get("wall_ms"), (int, float)) or peer["wall_ms"] <= 0:
+                return None
+            if not xu or not isinstance(xu.get("wall_ms"), (int, float)) or xu["wall_ms"] <= 0:
                 return None
             return round(xu["wall_ms"] / peer["wall_ms"], 2)
 
@@ -153,12 +161,12 @@ def generate_markdown_summary(payload: dict) -> str:
         f"- **运行平台 / 架构**: `{platform_label}`",
         f"- **编译器版本**: `Xu v{meta['xu_version']}`",
         f"- **测试负载数量**: `{meta['total_benches']}` 项算法与业务场景",
-        f"- **对比语言**: `C (Clang -O3)`, `Rust (rustc -O3)`, `Go (go build)`, `Swift (-O)`",
+        f"- **对比语言**: `C (Clang best O1–O3)`, `Rust (rustc best O1–O3)`, `Go (go build)`, `Swift (-O)`",
         f"- **评测准则**: `{meta['methodology']}`",
         "",
         "### 🌟 核心特性与资源开销总览",
         "",
-        "| 特性 / 负载 | Xu | Go | C (Clang -O3) | Rust (-O3) | 表现分析 |",
+        "| 特性 / 负载 | Xu | Go | C 最佳 (O1–O3) | Rust 最佳 (O1–O3) | 表现分析 |",
         "|---|---:|---:|---:|---:|---|",
     ]
 

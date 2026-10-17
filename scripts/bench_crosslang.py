@@ -930,16 +930,20 @@ def main():
         for n, b, best_ms, med_ms, rss_mib, cpu_ms, sz, ok, _c in results:
             if b != bench.name or ok != "OK":
                 continue
-            t_rel = xu_med / med_ms if med_ms > 0 else 0
-            r_rel = xu_rss / rss_mib if rss_mib > 0 else 0
-            c_rel = xu_cpu / cpu_ms if cpu_ms > 0 else 0
-            s_rel = xu_sz / sz if sz > 0 else 0
+            def fmt_ratio(val_xu, val_peer, label):
+                if val_xu > 0 and val_peer > 0:
+                    return f"{label} {val_xu / val_peer:.2f}×"
+                return f"{label}     — "
+
+            t_str = fmt_ratio(xu_med, med_ms, "wall")
+            r_str = fmt_ratio(xu_rss, rss_mib, "rss")
+            c_str = fmt_ratio(xu_cpu, cpu_ms, "cpu")
+            s_str = fmt_ratio(xu_sz, sz, "size")
             log(
                 f"{n:<22} wall med {med_ms:8.1f} best {best_ms:8.1f} ms  "
                 f"rss {rss_mib:6.2f} MiB  cpu {cpu_ms:8.1f} ms  "
                 f"size {sz:8d}  |  "
-                f"Xu wall {t_rel:.2f}×  rss {r_rel:.2f}×  cpu {c_rel:.2f}×  "
-                f"size {s_rel:.2f}×"
+                f"Xu {t_str}  {r_str}  {c_str}  {s_str}"
             )
 
     if curves_dir is not None and curves_by_bench:
