@@ -635,7 +635,10 @@ def main():
         sz = out_bin.stat().st_size
         timeout = None
         if name.startswith("xu") and name != XU_BASE and bench in xu_base_s:
-            timeout = max(xu_base_s[bench] * 5.0, 1.0)
+            # Unoptimized references may legitimately be much slower than a
+            # newly optimized product build. Allow ordinary runner jitter;
+            # the timeout detects hangs, while stdout checks detect errors.
+            timeout = max(xu_base_s[bench] * 5.0, 30.0)
         try:
             st = timed_runs(
                 str(out_bin),
