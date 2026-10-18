@@ -1,12 +1,26 @@
 """Shared hosted compiler selection for benchmark entry points."""
 from pathlib import Path
 import os
+import shutil
 import subprocess
 import sys
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 PRODUCT_RUNNER = ROOT / "scripts/run_product_compiler.sh"
+
+
+def git_bash() -> Path:
+    git = shutil.which("git")
+    roots = list(Path(git).resolve().parents) if git else []
+    roots.extend(Path(os.environ[key]) / "Git" for key in
+                 ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)") if os.environ.get(key))
+    for root in roots:
+        bash = root / "bin/bash.exe"
+        if bash.is_file():
+            return bash
+    raise SystemExit("Git for Windows Bash is required for the hosted seed resolver")
+
 
 def resolve_product_compiler(explicit: str | Path | None = None) -> Path:
     env = os.environ.copy()
@@ -18,8 +32,9 @@ def resolve_product_compiler(explicit: str | Path | None = None) -> Path:
     if sys.platform == "win32":
         # Native Python cannot execute .sh files or consume MSYS /d/... paths.
         # Run the same resolver in Git Bash and return a Windows-native path.
-        command = ["bash", "-c",
-                   'seed=$("$1/scripts/xu_host_seed.sh") || exit; cygpath -w "$seed"',
+        # A bare bash may resolve to the WSL launcher on Windows runners.
+        command = [str(git_bash()), "-c",
+                   'PATH="/usr/bin:/bin:$PATH"; seed=$("$1/scripts/xu_host_seed.sh") || exit; cygpath -w "$seed"',
                    "xu-bench-seed", ROOT.as_posix()]
     proc = subprocess.run(command, cwd=ROOT,
                           env=env, capture_output=True, text=True, check=False)
