@@ -53,12 +53,7 @@ else:
     ROOT = Path(xu_env or BENCH_ROOT.parent / "xu").expanduser().resolve()
 
 sys.path.insert(0, str(ROOT / "scripts"))
-try:
-    from companion_repos import project_root
-except ImportError:
-    def project_root(name: str, core_root: Path | None = None) -> Path:
-        base = core_root or ROOT
-        return base / name
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler
 CROSS = BENCH_ROOT / "tests" / "bench" / "cross"
 PRODUCT_XU = ROOT / "bin" / "xu"
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
@@ -66,11 +61,7 @@ PRODUCT_RUNNER = ROOT / "scripts" / "run_product_compiler.sh"
 # Keep the canonical names visible to the boundary checker and to downstream
 # benchmark tooling; both names intentionally point at the same wrapper.
 PRODUCT_COMPILER_RUNNER = PRODUCT_RUNNER
-ORACLE_SEED_OFF = "XU_ALLOW_ORACLE_SEED=0"
 
-# Boundary marker consumed by the static contract checker.  This benchmark
-# measures the hosted product compiler; the frozen Rust primer belongs to the
-# separately-labelled oracle/diagnostic suites.
 LANE = "product"
 
 RUN_ITERS = 7
@@ -106,83 +97,8 @@ def median(xs: list[float]) -> float:
     return (s[mid - 1] + s[mid]) / 2
 
 
-def _lexical_path(path: Path) -> Path:
-    """Return an absolute path without following symlink components."""
-
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    return candidate.absolute()
-
-
-def _is_primer(path: Path, resolved: Path | None = None) -> bool:
-    """Classify lexical and resolved bootstrap provenance."""
-
-    lexical = _lexical_path(path)
-    if resolved is None:
-        try:
-            target = lexical.resolve()
-        except (OSError, RuntimeError):
-            target = lexical
-    else:
-        target = _lexical_path(resolved)
-    bootstrap = project_root("bootstrap", core_root=ROOT)
-    for candidate in (lexical, target):
-        try:
-            candidate.relative_to(bootstrap)
-        except (OSError, RuntimeError, ValueError):
-            continue
-        return True
-    return False
-
-
 def resolve_product_compiler(explicit: str | None) -> Path:
-    """Resolve a hosted compiler without a product→primer fallback."""
-
-    raw: Path | None = None
-    if explicit:
-        raw = Path(explicit).expanduser()
-        compiler = raw.resolve()
-    else:
-        # Check standard bin path first
-        candidate = ROOT / "bin" / ("xu.exe" if sys.platform == "win32" else "xu")
-        if candidate.is_file():
-            compiler = candidate.resolve()
-        elif sys.platform != "win32" and HOST_SEED_RESOLVER.is_file():
-            env = os.environ.copy()
-            env["XU_ALLOW_ORACLE_SEED"] = ORACLE_SEED_OFF.split("=", 1)[1]
-            env.pop("XU_SEED", None)
-            probe = subprocess.run(
-                [str(HOST_SEED_RESOLVER)],
-                cwd=ROOT,
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if probe.returncode != 0:
-                raise SystemExit(
-                    "hosted product compiler missing; run make xu or pass --xu=/path/to/bin/xu"
-                )
-            lines = [line.strip() for line in probe.stdout.splitlines() if line.strip()]
-            if len(lines) != 1:
-                raise SystemExit("hosted seed resolver returned invalid output")
-            compiler = Path(lines[0]).expanduser().resolve()
-        else:
-            raise SystemExit(
-                "hosted product compiler missing; run make xu or pass --xu=/path/to/bin/xu"
-            )
-
-    if _is_primer(raw if raw is not None else compiler, compiler):
-        raise SystemExit(
-            "bootstrap primer is oracle-only; use an oracle diagnostic suite "
-            "instead of bench_crosslang"
-        )
-    if not compiler.is_file():
-        raise SystemExit(f"hosted product compiler does not exist: {compiler}")
-    if sys.platform != "win32" and not os.access(compiler, os.X_OK):
-        raise SystemExit(f"hosted product compiler is not executable: {compiler}")
-    return compiler
+    return resolve_hosted_compiler(explicit)
 
 
 # Stable seam name shared with the other product benchmark drivers.
