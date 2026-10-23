@@ -37,32 +37,13 @@ from bench_rusage import (  # noqa: E402
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from companion_repos import project_root
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
 GAME = BENCH_ROOT / "tests" / "bench" / "game"
 CROSS = GAME / "cross"
 GOLDEN = GAME / "golden"
-_BOOT_CANDIDATES = (
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe",
-)
-BOOT = next((candidate for candidate in _BOOT_CANDIDATES if candidate.is_file()), _BOOT_CANDIDATES[0])
-# Keep the oracle lane anchored to the reproducible Gen0 artifacts.  Product
-# callers may pass an arbitrary hosted seed, but ``--lane oracle`` must not
-# turn an unrelated executable into oracle evidence.
-FROZEN_PRIMER_PATHS = frozenset(
-    {
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe").absolute(),
-    }
-)
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
 PRODUCT_RUNNER = ROOT / "scripts" / "run_product_compiler.sh"
 PRODUCT_COMPILER_RUNNER = PRODUCT_RUNNER
-ORACLE_SEED_OFF = "XU_ALLOW_ORACLE_SEED=0"
 LANE = "product"
 
 RUN_ITERS = 5
@@ -157,120 +138,8 @@ def parse_benches(s: str | None) -> list[Bench]:
     return out
 
 
-def _lexical_path(path: Path) -> Path:
-    """Return an absolute path without resolving symlink components."""
-
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    return candidate.absolute()
-
-
-def _has_symlink_component(path: Path) -> bool:
-    candidate = _lexical_path(path)
-    owner = project_root("bootstrap", core_root=ROOT)
-    if not candidate.is_relative_to(owner):
-        owner = ROOT
-    try:
-        relative = candidate.relative_to(owner)
-    except ValueError:
-        return False
-    if owner.is_symlink():
-        return True
-    current = owner
-    for part in relative.parts:
-        current /= part
-        try:
-            if current.is_symlink():
-                return True
-        except OSError:
-            return True
-    return False
-
-
-def _is_primer(path: Path, resolved: Path | None = None) -> bool:
-    """Classify lexical *and* resolved bootstrap paths.
-
-    Checking only ``resolved`` would let a primer path symlink to an external
-    executable pass as a hosted product compiler.
-    """
-
-    lexical = _lexical_path(path)
-    if resolved is None:
-        try:
-            target = lexical.resolve()
-        except (OSError, RuntimeError):
-            target = lexical
-    else:
-        target = _lexical_path(resolved)
-    bootstrap = project_root("bootstrap", core_root=ROOT)
-    for candidate in (lexical, target):
-        try:
-            candidate.relative_to(bootstrap)
-        except (OSError, RuntimeError, ValueError):
-            continue
-        return True
-    return False
-
-
-def _is_frozen_primer(path: Path) -> bool:
-    """Return whether *path* is one of the declared Gen0 artifacts."""
-
-    lexical = _lexical_path(path)
-    if (
-        lexical not in FROZEN_PRIMER_PATHS
-        or _has_symlink_component(lexical)
-        or not lexical.is_file()
-        or not os.access(lexical, os.X_OK)
-    ):
-        return False
-    try:
-        # A canonical artifact must resolve to itself; this rejects both a
-        # symlinked file and a symlinked parent alias.
-        return lexical.resolve() == lexical
-    except (OSError, RuntimeError):
-        return False
-
-
 def resolve_product_xu(explicit: str | None) -> Path:
-    """Resolve a hosted product seed without a primer/cargo fallback."""
-
-    if not PRODUCT_COMPILER_RUNNER.is_file() or not os.access(
-        PRODUCT_COMPILER_RUNNER, os.X_OK
-    ):
-        raise SystemExit(f"bench_game: missing product compiler wrapper: {PRODUCT_COMPILER_RUNNER}")
-    if explicit:
-        raw = Path(explicit).expanduser()
-        compiler = raw.resolve()
-    else:
-        env = os.environ.copy()
-        env["XU_ALLOW_ORACLE_SEED"] = ORACLE_SEED_OFF.split("=", 1)[1]
-        env.pop("XU_SEED", None)
-        resolved = subprocess.run(
-            [str(HOST_SEED_RESOLVER)],
-            cwd=ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if resolved.returncode != 0:
-            raise SystemExit(
-                "bench_game: hosted product compiler missing; run make xu "
-                "or pass --xu=/path/to/hosted-xu"
-            )
-        lines = [line.strip() for line in resolved.stdout.splitlines() if line.strip()]
-        if len(lines) != 1:
-            raise SystemExit("bench_game: hosted seed resolver returned invalid output")
-        compiler = Path(lines[0]).expanduser().resolve()
-    if _is_primer(raw if explicit else compiler, compiler):
-        raise SystemExit(
-            "bench_game: bootstrap primer is oracle-only; use --oracle "
-            "for an explicit primer benchmark"
-        )
-    if not compiler.is_file() or not os.access(compiler, os.X_OK):
-        raise SystemExit(f"bench_game: compiler is not executable: {compiler}")
-    return compiler
+    return resolve_hosted_compiler(explicit)
 
 
 def golden_bytes(b: Bench) -> bytes:
@@ -386,19 +255,9 @@ def compile_one(
     if lang == "xu":
         out = tmp / f"{lang}_{bench.name}"
         src = str(GAME / f"{bench.name}.xu")
-        if lane == "product":
-            cmd = [
-                str(PRODUCT_RUNNER),
-                str(xu_bin),
-                "build",
-                src,
-                "-o",
-                str(out),
-            ]
-        else:
-            # The frozen primer keeps the historical file-first CLI; it is
-            # accepted only from the explicit oracle lane.
-            cmd = [str(xu_bin), "-O1", src, "-o", str(out)]
+        if lane != "product":
+            raise ValueError(f"unsupported compiler lane: {lane}")
+        cmd = [str(PRODUCT_RUNNER), str(xu_bin), "build", src, "-o", str(out)]
     elif lang == "c":
         clang = tools.get("clang")
         if not clang:
@@ -497,11 +356,10 @@ def main():
     )
     ap.add_argument(
         "--lane",
-        choices=("product", "oracle"),
+        choices=("product",),
         default="product",
-        help="compiler lane (default: product; oracle explicitly permits bootstrap)",
+        help="hosted product compiler lane",
     )
-    ap.add_argument("--oracle", action="store_true", help="alias for --lane oracle")
     ap.add_argument("--out", help="write timing table here")
     ap.add_argument("--report", help="also write markdown report path")
     ap.add_argument("--benches", help="comma-separated subset")
@@ -538,29 +396,9 @@ def main():
     if args.sample_ms < 0:
         raise SystemExit("--sample-ms must be >= 0")
 
-    lane = "oracle" if args.oracle else args.lane
-    if args.oracle and args.lane != "product":
-        raise SystemExit("bench_game: use either --oracle or --lane oracle, not both")
-
-    if lane == "product":
-        xu_bin = resolve_product_xu(args.xu)
-    else:
-        raw_xu = Path(args.xu).expanduser() if args.xu else BOOT
-        xu_bin = raw_xu.resolve()
-        if not _is_frozen_primer(raw_xu):
-            raise SystemExit(
-                "bench_game: oracle lane requires the frozen bootstrap primer "
-                "(bootstrap/target/{debug,release}/xu[.exe]); use --lane product for "
-                "a hosted compiler"
-            )
-    if not xu_bin.is_file() or not os.access(xu_bin, os.X_OK):
-        raise SystemExit(
-            f"missing executable Xu compiler: {xu_bin}; build bootstrap explicitly "
-            "then pass --oracle for primer diagnostics"
-            if lane == "oracle"
-            else f"missing executable Xu compiler: {xu_bin}"
-        )
-    if lane == "product" and not PRODUCT_COMPILER_RUNNER.is_file():
+    lane = args.lane
+    xu_bin = resolve_product_xu(args.xu)
+    if not PRODUCT_COMPILER_RUNNER.is_file():
         raise SystemExit(
             f"bench_game: missing product compiler wrapper: {PRODUCT_COMPILER_RUNNER}"
         )

@@ -11,17 +11,14 @@ compilers. Stdout locked per compiler.
 
 Usage:
   ./scripts/bench_opt_full.sh                 # one-command full save + timings
-  python3 scripts/bench_opt_levels.py --lane oracle --save
+  python3 scripts/bench_opt_levels.py --save
   python3 scripts/bench_opt_levels.py --lane product --xu ./bin/xu --check
   python3 scripts/bench_opt_levels.py --skip-runtime --save
   python3 scripts/bench_opt_levels.py --benches=loop_sum,array_ops
   python3 scripts/bench_opt_levels.py --sample-ms=0 --no-rustc --no-swiftc
 
-The default lane is the frozen bootstrap/oracle benchmark.  A hosted product
-compiler must be selected explicitly with ``--lane product``; product
-compiles always pass through ``xu_host_seed.sh`` and the hermetic
-``run_product_compiler.sh`` seam.  There is deliberately no cargo/bootstrap
-fallback in this Python driver.
+The default compiler is the hosted product, resolved by xu_host_seed.sh.
+All Xu compilations use run_product_compiler.sh to isolate imports and caches.
 """
 from __future__ import annotations
 
@@ -55,34 +52,13 @@ from bench_rusage import run_one, sparkline, write_curve_csv, write_rss_svg  # n
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from companion_repos import project_root
-_BOOT_CANDIDATES = (
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe",
-)
-BOOT_XU = next((candidate for candidate in _BOOT_CANDIDATES if candidate.is_file()), _BOOT_CANDIDATES[0])
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
 PRODUCT_RUNNER = ROOT / "scripts" / "run_product_compiler.sh"
 # Keep this alias explicit: the boundary checker and product consumers use
 # the same seam name when auditing compiler invocations.
 PRODUCT_COMPILER_RUNNER = PRODUCT_RUNNER
-ORACLE_SEED_OFF = "XU_ALLOW_ORACLE_SEED=0"
-# This module is registered as a diagnostic/oracle consumer.  Product mode is
-# available only as an explicit, separately labelled comparison.
-LANE = "oracle"
-# Oracle evidence is restricted to the reproducible Gen0 build outputs.  Keep
-# Windows names in the contract even on Unix hosts; missing artifacts are
-# handled by the executable check at selection time.
-FROZEN_PRIMER_PATHS = frozenset(
-    {
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe").absolute(),
-    }
-)
+LANE = "product"
 SNAPSHOT = BENCH_ROOT / "reports" / "bench_opt_levels.latest.txt"
 GATE_BENCHES = "loop_sum,sha256_chain,sort_lcg,iface_sum,match_sum"
 OPTS = (0, 1, 2, 3)
@@ -228,80 +204,6 @@ def sha12(data: bytes) -> str:
     return hashlib.sha1(data).hexdigest()[:12]
 
 
-def _lexical_path(path: Path) -> Path:
-    """Return an absolute path without following symlinks."""
-
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    return candidate.absolute()
-
-
-def _has_symlink_component(path: Path) -> bool:
-    candidate = _lexical_path(path)
-    owner = project_root("bootstrap", core_root=ROOT)
-    if not candidate.is_relative_to(owner):
-        owner = ROOT
-    try:
-        relative = candidate.relative_to(owner)
-    except ValueError:
-        return False
-    if owner.is_symlink():
-        return True
-    current = owner
-    for part in relative.parts:
-        current /= part
-        try:
-            if current.is_symlink():
-                return True
-        except OSError:
-            return True
-    return False
-
-
-def is_primer(compiler: Path, resolved: Path | None = None) -> bool:
-    """Classify lexical and resolved bootstrap provenance.
-
-    Keeping the lexical spelling is essential: a primer executable symlinked
-    to an external file must remain oracle-only instead of becoming a hosted
-    product seed after ``resolve()``.
-    """
-
-    lexical = _lexical_path(compiler)
-    if resolved is None:
-        try:
-            target = lexical.resolve()
-        except (OSError, RuntimeError):
-            target = lexical
-    else:
-        target = _lexical_path(resolved)
-    bootstrap = project_root("bootstrap", core_root=ROOT)
-    for candidate in (lexical, target):
-        try:
-            candidate.relative_to(bootstrap)
-        except (OSError, RuntimeError, ValueError):
-            continue
-        return True
-    return False
-
-
-def is_frozen_primer(path: Path) -> bool:
-    """Return true only for an exact, non-symlink Gen0 artifact."""
-
-    lexical = _lexical_path(path)
-    if (
-        lexical not in FROZEN_PRIMER_PATHS
-        or _has_symlink_component(lexical)
-        or not lexical.is_file()
-        or not os.access(lexical, os.X_OK)
-    ):
-        return False
-    try:
-        return lexical.resolve() == lexical
-    except (OSError, RuntimeError):
-        return False
-
-
 def is_executable(path: Path) -> bool:
     return path.is_file() and os.access(path, os.X_OK)
 
@@ -324,101 +226,12 @@ def _lexical_candidate(value: str) -> Path:
     return _lexical_path(Path(value))
 
 
-def _resolve_hosted_seed(explicit: str | None) -> Path:
-    """Resolve a hosted product seed through the canonical shell resolver.
-
-    The resolver is run with the oracle opt-in disabled for *both* automatic
-    and explicit seeds.  Its stdout must contain exactly one canonical path;
-    anything else is a fail-closed error rather than an opportunity to try the
-    bootstrap primer.
-    """
-
-    if not is_executable(HOST_SEED_RESOLVER):
-        raise SystemExit(
-            f"bench_opt_levels: missing executable hosted seed resolver: {HOST_SEED_RESOLVER}"
-        )
-    env = os.environ.copy()
-    env["XU_ALLOW_ORACLE_SEED"] = ORACLE_SEED_OFF.split("=", 1)[1]
-    if explicit is None:
-        env.pop("XU_SEED", None)
-    else:
-        # Keep the lexical spelling for xu_host_seed.sh; resolving here would
-        # hide a symlinked bootstrap component from its boundary guard.
-        env["XU_SEED"] = str(_lexical_candidate(explicit))
-    proc = subprocess.run(
-        [str(HOST_SEED_RESOLVER)],
-        cwd=ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout or "resolver failed").strip().splitlines()
-        tail = detail[-1] if detail else "resolver failed"
-        raise SystemExit(f"bench_opt_levels: hosted product seed rejected: {tail}")
-    lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
-    if len(lines) != 1:
-        raise SystemExit(
-            "bench_opt_levels: xu_host_seed.sh returned an invalid compiler path"
-        )
-    compiler = _absolute_candidate(lines[0])
-    if not is_executable(compiler):
-        raise SystemExit(
-            f"bench_opt_levels: hosted seed is not executable: {compiler}"
-        )
-    if is_primer(compiler):
-        # Keep this guard even though xu_host_seed.sh already rejects it: it
-        # protects the Python seam if the resolver is replaced or mocked.
-        raise SystemExit(
-            "bench_opt_levels: bootstrap primer is oracle-only; "
-            "select --lane oracle for direct diagnostic use"
-        )
-    return compiler
-
-
-def xu_compile_argv(
-    compiler: Path,
-    src: Path,
-    opt: int,
-    out: Path,
-    extra: list[str] | None = None,
-    *,
-    lane: str = LANE,
-) -> list[str]:
-    if lane not in {"oracle", "product"}:
-        raise ValueError(f"bench_opt_levels: invalid compiler lane {lane!r}")
-    flag = f"-O{opt}"
-    extra = extra or []
-    if lane == "oracle":
-        if not is_frozen_primer(compiler):
-            raise ValueError(
-                "bench_opt_levels: oracle compile requires the frozen bootstrap primer"
-            )
-        # Gen0 uses the direct CLI (`xu file.xu ...`), not the hosted `build`
-        # subcommand.  Keep this branch visibly direct and never route it
-        # through the product wrapper.
-        return [str(compiler), flag, *extra, str(src), "-o", str(out)]
-    if not is_executable(PRODUCT_COMPILER_RUNNER):
-        raise ValueError(
-            f"bench_opt_levels: missing product compiler wrapper: {PRODUCT_COMPILER_RUNNER}"
-        )
-    if is_primer(compiler):
-        raise ValueError(
-            "bench_opt_levels: bootstrap primer cannot be used in product lane"
-        )
-    # Product invocations must cross both seams: the caller resolves the
-    # hosted seed above, then this wrapper isolates XUPATH/cache/HOME.
-    return [
-        str(PRODUCT_COMPILER_RUNNER),
-        str(compiler),
-        "build",
-        str(src),
-        flag,
-        *extra,
-        "-o",
-        str(out),
-    ]
+def xu_compile_argv(compiler: Path, src: Path, opt: int, out: Path,
+                    extra: list[str] | None = None, *, lane: str = LANE) -> list[str]:
+    if lane != "product":
+        raise ValueError(f"unsupported compiler lane: {lane}")
+    return [str(PRODUCT_COMPILER_RUNNER), str(compiler), "build", str(src),
+            f"-O{opt}", *(extra or []), "-o", str(out)]
 
 
 def clang_compile_argv(clang: str, src: Path, opt: int, out: Path) -> list[str]:
@@ -453,39 +266,10 @@ def ensure_xupath() -> None:
         os.environ["XUPATH"] = src if not cur else f"{src}:{cur}"
 
 
-def resolve_compiler(explicit: str | None, lane: str = LANE) -> Path:
-    """Resolve a compiler with an explicit oracle/product lane.
-
-    Oracle selection is direct and requires the frozen primer to already
-    exist.  Product selection delegates to ``xu_host_seed.sh`` and has no
-    cargo/bootstrap fallback.  The default lane is intentionally oracle for
-    this diagnostic benchmark, so a product caller must say so explicitly.
-    """
-
-    if lane not in {"oracle", "product"}:
-        raise SystemExit(f"bench_opt_levels: invalid compiler lane {lane!r}")
-    if lane == "product":
-        if not is_executable(PRODUCT_COMPILER_RUNNER):
-            raise SystemExit(
-                f"bench_opt_levels: missing executable product compiler wrapper: "
-                f"{PRODUCT_COMPILER_RUNNER}"
-            )
-        return _resolve_hosted_seed(explicit)
-
-    raw = Path(explicit).expanduser() if explicit else BOOT_XU
-    compiler = raw.resolve()
-    if not is_executable(compiler):
-        raise SystemExit(
-            "bench_opt_levels: bootstrap primer missing or not executable: "
-            f"{compiler}; build it explicitly (`make bootstrap`) and pass "
-            "--lane oracle"
-        )
-    if not is_frozen_primer(raw):
-        raise SystemExit(
-            "bench_opt_levels: oracle lane requires the frozen bootstrap primer; "
-            "use --lane product for a hosted compiler"
-        )
-    return compiler
+def resolve_compiler(explicit: str | None, lane: str = "product") -> Path:
+    if lane != "product":
+        raise ValueError(f"unsupported compiler lane: {lane}")
+    return resolve_hosted_compiler(explicit)
 
 
 def resolve_product_xu(explicit: str | None) -> Path:
@@ -605,14 +389,9 @@ def main() -> int:
     ap.add_argument("--xu", help="compiler path (lane-specific; no implicit fallback)")
     ap.add_argument(
         "--lane",
-        choices=("oracle", "product"),
+        choices=("product",),
         default=LANE,
-        help="compiler lane (default: oracle; product requires an explicit hosted seed)",
-    )
-    ap.add_argument(
-        "--oracle",
-        action="store_true",
-        help="alias for --lane oracle (kept for diagnostic scripts)",
+        help="hosted product compiler lane (default: product)",
     )
     ap.add_argument("--clang", default="clang")
     ap.add_argument("--go", default="go")
@@ -703,19 +482,8 @@ def main() -> int:
     if args.sample_ms < 0:
         raise SystemExit("--sample-ms must be >= 0")
 
-    if args.oracle and args.lane != LANE:
-        raise SystemExit("bench_opt_levels: use either --oracle or --lane oracle")
-    lane = "oracle" if args.oracle else args.lane
-    compiler = (
-        resolve_product_xu(args.xu)
-        if lane == "product"
-        else resolve_compiler(args.xu, lane)
-    )
-    # The direct primer CLI resolves the complete source closure through
-    # XUPATH.  Product invocations go through run_product_compiler.sh, which
-    # deliberately clears ambient source/cache injection channels.
-    if lane == "oracle":
-        ensure_xupath()
+    lane = args.lane
+    compiler = resolve_product_xu(args.xu)
 
     def pick(flag: bool, name: str, arg: str) -> str | None:
         if flag:
@@ -749,7 +517,7 @@ def main() -> int:
         lines.append(s)
 
     host = subprocess.run(["uname", "-sm"], capture_output=True, text=True).stdout.strip()
-    kind = "primer" if lane == "oracle" else "product"
+    kind = "product"
     disc = "yes" if args.discard_first else "no"
     sample_s = None if args.sample_ms <= 0 else args.sample_ms / 1000.0
     out_path = Path(args.out) if args.out else (SNAPSHOT if args.save else None)

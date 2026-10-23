@@ -1,75 +1,51 @@
-"""Keep product/oracle selection anchored to the companion Xu checkout."""
+"""Benchmarks use the shared hosted compiler policy."""
 import importlib
+import os
+import subprocess
 import sys
 from pathlib import Path
-
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+BENCH = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BENCH / 'scripts'))
 
 
-@pytest.mark.parametrize("name,guard", [
-    ("bench_game", "_is_frozen_primer"),
-    ("bench_stdlib", "is_frozen_primer"),
-    ("bench_opt_levels", "is_frozen_primer"),
-    ("bench_opt_full", "is_frozen_primer"),
-    ("opt_stage_bisect", "is_frozen_primer"),
+@pytest.mark.parametrize('name,resolver', [
+    ('bench_crosslang', 'resolve_product_compiler'),
+    ('bench_game', 'resolve_product_xu'),
+    ('bench_stdlib', 'resolve_product_xu'),
+    ('bench_opt_levels', 'resolve_product_xu'),
 ])
-def test_oracle_rejects_arbitrary_binaries_and_symlinks(tmp_path, monkeypatch, name, guard):
+def test_product_resolution_delegates_to_shared_policy(monkeypatch, name, resolver):
     module = importlib.import_module(name)
-    compiler = tmp_path / "bootstrap/target/debug/xu"
-    compiler.parent.mkdir(parents=True)
-    compiler.write_text("#!/bin/sh\nexit 0\n")
+    calls = []
+    expected = Path('/tmp/hosted-compiler')
+    def resolve(explicit):
+        calls.append(explicit)
+        return expected
+    monkeypatch.setattr(module, 'resolve_hosted_compiler', resolve)
+    assert getattr(module, resolver)('/tmp/requested') == expected
+    assert calls == ['/tmp/requested']
+
+
+@pytest.mark.parametrize('name', ['bench_stdlib', 'bench_opt_levels'])
+def test_retired_lane_is_rejected(name):
+    module = importlib.import_module(name)
+    with pytest.raises(ValueError, match='unsupported compiler lane'):
+        module.resolve_compiler(None, 'oracle')
+
+
+def test_shared_policy_accepts_windows_suffix_and_rejects_directories(tmp_path, monkeypatch):
+    module = importlib.import_module('product_compiler')
+    root = tmp_path / 'xu'
+    (root / 'scripts').mkdir(parents=True)
+    core = Path(os.environ['XU_ROOT'])
+    import shutil
+    shutil.copy2(core / 'scripts/xu_host_seed.sh', root / 'scripts/xu_host_seed.sh')
+    compiler = tmp_path / 'compiler.exe'
+    compiler.write_text('#!/bin/sh\nexit 0\n')
     compiler.chmod(0o755)
-    monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "FROZEN_PRIMER_PATHS", frozenset({compiler.absolute()}))
-    check = getattr(module, guard)
-    assert check(compiler)
-    assert not check(Path("/bin/echo"))
-    alias = tmp_path / "alias"
-    alias.symlink_to(compiler)
-    assert not check(alias)
-    compiler.unlink()
-    compiler.symlink_to("/bin/echo")
-    assert not check(compiler)
-
-
-@pytest.mark.parametrize("name,classifier", [
-    ("bench_crosslang", "_is_primer"),
-    ("bench_game", "_is_primer"),
-    ("bench_stdlib", "is_primer"),
-    ("bench_opt_levels", "is_primer"),
-])
-def test_product_classifier_follows_bootstrap_alias(tmp_path, monkeypatch, name, classifier):
-    module = importlib.import_module(name)
-    bootstrap = tmp_path / "bootstrap"
-    bootstrap.mkdir()
-    compiler = bootstrap / "xu"
-    compiler.write_text("primer")
-    alias = tmp_path / "hosted-looking-xu"
-    alias.symlink_to(compiler)
-    monkeypatch.setattr(module, "ROOT", tmp_path)
-    assert getattr(module, classifier)(alias)
-
-
-def test_stdlib_default_oracle_rejects_symlink(tmp_path, monkeypatch):
-    module = importlib.import_module("bench_stdlib")
-    candidate = tmp_path / "bootstrap/target/debug/xu"
-    candidate.parent.mkdir(parents=True)
-    candidate.symlink_to("/bin/echo")
-    monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "BOOT_XU", candidate)
-    monkeypatch.setattr(module, "FROZEN_PRIMER_PATHS", frozenset({candidate.absolute()}))
+    monkeypatch.setattr(module, 'ROOT', root)
+    assert module.resolve_product_compiler(str(compiler)[:-4]) == compiler
     with pytest.raises(SystemExit):
-        module.resolve_compiler(None, "oracle")
-
-
-def test_product_resolution_retains_symlink_provenance(tmp_path, monkeypatch):
-    module = importlib.import_module("bench_stdlib")
-    candidate = tmp_path / "bootstrap/target/debug/xu"
-    candidate.parent.mkdir(parents=True)
-    candidate.symlink_to("/bin/echo")
-    monkeypatch.setattr(module, "ROOT", tmp_path)
-    monkeypatch.setattr(module, "PRODUCT_RUNNER", Path("/bin/echo"))
-    with pytest.raises(SystemExit):
-        module.resolve_compiler(str(candidate), "product")
+        module.resolve_product_compiler(root)

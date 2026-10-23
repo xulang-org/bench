@@ -5,8 +5,8 @@ Benchmarks Game、Clang 差距、资源曲线与 stdout 金标。
 
 默认与 `xu` 放在同级目录；可通过 `XU_ROOT=/path/to/xu` 选择编译器源码仓库。
 编译器与标准库仍由 Xu 仓库构建，本仓库维护负载、对照实现和测量方法。
-产品负载通过 Xu 的 hosted seed resolver 与 hermetic wrapper 编译；
-显式 oracle 诊断只接受冻结的 bootstrap primer。
+全部基准通过 Xu 的 hosted seed resolver 与 hermetic wrapper 编译，
+只依赖产品编译器；运行时对拍比较同一编译器的 O0 与默认优化结果。
 
 ```sh
 make list

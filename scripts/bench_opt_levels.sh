@@ -22,7 +22,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 BENCH_ROOT=$(pwd -P)
 ROOT=$(cd "${XU_ROOT:-$BENCH_ROOT/../xu}" && pwd -P)
-BOOTSTRAP_ROOT=$("$ROOT/scripts/xu_host_seed.sh" --bootstrap-root)
 export XU_ROOT="$ROOT"
 export XU_ROOT="$ROOT"
 cd "$BENCH_ROOT"
@@ -74,40 +73,7 @@ if [ "$CHECK" = 1 ] && [ "$FULL" = 0 ] && [ "$QUICK" = 0 ]; then
     PY+=(--quick)
 fi
 
-if [ "$HAS_XU" = 0 ]; then
-    # The no-override form is intentionally the frozen oracle benchmark.  A
-    # caller that supplies a hosted product compiler must not trigger an
-    # unrelated cargo/bootstrap build merely as a hidden fallback.
-    cargo build --quiet --manifest-path "$BOOTSTRAP_ROOT/Cargo.toml" -p xu \
-        || { echo "bench_opt_levels: bootstrap build failed"; exit 1; }
-    # Primer is the O0–O3 ruler (matches cargo e2e). Product via --xu=bin/xu.
-    LANE="oracle"
-    echo "bench_opt_levels: lane=oracle (bootstrap primer default; product requires explicit --xu)" >&2
-    primer=""
-    for candidate in \
-        "$BOOTSTRAP_ROOT/target/debug/xu" \
-        "$BOOTSTRAP_ROOT/target/debug/xu.exe" \
-        "$BOOTSTRAP_ROOT/target/release/xu" \
-        "$BOOTSTRAP_ROOT/target/release/xu.exe"; do
-        if [ -x "$candidate" ]; then
-            primer=$candidate
-            break
-        fi
-    done
-    [ -n "$primer" ] || { echo "bench_opt_levels: bootstrap compiler missing after build" >&2; exit 1; }
-    PY+=(--xu "$primer")
-else
-    # An explicit compiler override is product by default; a path naming the
-    # frozen primer remains oracle so the label cannot over-claim evidence.
-    case "$XU_OVERRIDE" in
-        bootstrap/*|*/bootstrap/*) LANE="oracle"; echo "bench_opt_levels: lane=oracle (explicit bootstrap --xu)" >&2 ;;
-        *) LANE="product"; echo "bench_opt_levels: lane=product (explicit --xu override)" >&2 ;;
-    esac
-fi
-
-# Pass the lane chosen by this wrapper explicitly.  The Python driver defaults
-# to oracle for its diagnostic contract and must not infer a product lane from
-# a path (or silently fall back to the primer).
+LANE=product
 PY+=(--lane "$LANE")
 
 export XUPATH="$ROOT/src${XUPATH:+:$XUPATH}"

@@ -12,9 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# BOUNDARY: this full O0–O3 appendix is an oracle diagnostic by default; the
-# product compiler must be supplied explicitly through bench_opt_levels.sh.
-LANE="oracle"
+LANE="product"
 
 SNAPSHOT="${BENCH_OPT_SNAPSHOT:-reports/bench_opt_levels.latest.txt}"
 

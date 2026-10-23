@@ -47,7 +47,6 @@ def source_closure() -> dict[str, str]:
     closure = {}
     for label, checkout, domains in (
         ("xu", XU_ROOT, ("src", "scripts")),
-        ("bootstrap", project_root("bootstrap", core_root=XU_ROOT), ("crates",)),
         ("xu-bench", ROOT, ("tests/bench", "scripts")),
     ):
         paths = []

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Locate the first MIR pass (or emit/RA) that breaks a bench.
 
-Compiles with primer `--dump-opt-stages` and `--opt-stop`, then runs the
+Compiles with the hosted product `--dump-opt-stages` and `--opt-stop`, then runs the
 binary. If every MIR prefix matches expected stdout but O2+RA does not,
 the first wrong stage is emit/RA (the iface_sum O2 S2 pin case).
 
@@ -22,10 +22,8 @@ from pathlib import Path
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from companion_repos import project_root
-# BOUNDARY: this tool deliberately bisects the frozen Rust primer's MIR
-# stages.  Its findings are oracle diagnostics, never product self-host proof.
-LANE = "oracle"
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+LANE = "product"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_crosslang import BY_NAME, xu_src  # noqa: E402
 from bench_rusage import run_one  # noqa: E402
@@ -48,66 +46,6 @@ PASSES = [
     "unroll_simplify",
 ]
 
-_BOOT_CANDIDATES = (
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe",
-)
-BOOT = next((candidate for candidate in _BOOT_CANDIDATES if candidate.is_file()), _BOOT_CANDIDATES[0])
-FROZEN_PRIMER_PATHS = frozenset(
-    {
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe").absolute(),
-    }
-)
-
-
-def _lexical_path(path: Path) -> Path:
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    return candidate.absolute()
-
-
-def _has_symlink_component(path: Path) -> bool:
-    candidate = _lexical_path(path)
-    owner = project_root("bootstrap", core_root=ROOT)
-    if not candidate.is_relative_to(owner):
-        owner = ROOT
-    try:
-        relative = candidate.relative_to(owner)
-    except ValueError:
-        return False
-    if owner.is_symlink():
-        return True
-    current = owner
-    for part in relative.parts:
-        current /= part
-        try:
-            if current.is_symlink():
-                return True
-        except OSError:
-            return True
-    return False
-
-
-def is_frozen_primer(path: Path) -> bool:
-    lexical = _lexical_path(path)
-    if (
-        lexical not in FROZEN_PRIMER_PATHS
-        or _has_symlink_component(lexical)
-        or not lexical.is_file()
-        or not os.access(lexical, os.X_OK)
-    ):
-        return False
-    try:
-        return lexical.resolve() == lexical
-    except (OSError, RuntimeError):
-        return False
-
 
 def compile_run(
     src: Path,
@@ -121,9 +59,8 @@ def compile_run(
     cur = env.get("XUPATH", "")
     if src_root not in cur.split(":"):
         env["XUPATH"] = src_root if not cur else f"{src_root}:{cur}"
-    if not is_frozen_primer(BOOT):
-        return False, "oracle compiler is not the canonical frozen primer", 0.0
-    cmd = [str(BOOT), *flags, str(src), "-o", str(out)]
+    compiler = resolve_hosted_compiler()
+    cmd = [str(HOSTED_RUNNER), str(compiler), "build", *flags, str(src), "-o", str(out)]
     p = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if p.returncode != 0:
         err = (p.stderr or p.stdout)[-300:].replace("\n", " ")
@@ -189,8 +126,7 @@ def main() -> int:
     )
     ap.add_argument("--iters", type=int, default=3)
     args = ap.parse_args()
-    if not BOOT.is_file() or not is_frozen_primer(BOOT):
-        raise SystemExit(f"missing primer {BOOT}; run `make bootstrap`")
+    resolve_hosted_compiler()
     bench = BY_NAME.get(args.bench)
     if bench is None:
         raise SystemExit(f"unknown bench {args.bench}")

@@ -9,13 +9,13 @@ import pytest
 from scripts import bench_opt_full, bench_opt_levels
 
 
-def test_oracle_timings_require_matching_snapshot(tmp_path) -> None:
+def test_product_timings_require_matching_snapshot(tmp_path) -> None:
     primer = tmp_path / "xu"
     primer.write_bytes(b"primer fixture")
     digest = hashlib.sha256(primer.read_bytes()).hexdigest()
     report = tmp_path / "report.txt"
     report.write_text(
-        f"# lane: oracle\n# xu_sha256: {digest}\n# benches: loop_sum\n"
+        f"# lane: product\n# xu_sha256: {digest}\n# benches: loop_sum\n"
     )
 
     assert [bench.name for bench in bench_opt_full.snapshot_benches(report, primer)] == [
@@ -23,13 +23,13 @@ def test_oracle_timings_require_matching_snapshot(tmp_path) -> None:
     ]
 
     report.write_text(
-        f"# lane: product\n# xu_sha256: {digest}\n# benches: loop_sum\n"
+        f"# lane: oracle\n# xu_sha256: {digest}\n# benches: loop_sum\n"
     )
-    with pytest.raises(SystemExit, match="oracle snapshot"):
+    with pytest.raises(SystemExit, match="product snapshot"):
         bench_opt_full.snapshot_benches(report, primer)
 
     report.write_text(
-        "# lane: oracle\n# xu_sha256: different\n# benches: loop_sum\n"
+        "# lane: product\n# xu_sha256: different\n# benches: loop_sum\n"
     )
     with pytest.raises(SystemExit, match="SHA differs"):
         bench_opt_full.snapshot_benches(report, primer)

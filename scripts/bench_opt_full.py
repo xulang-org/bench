@@ -17,31 +17,10 @@ from bench_crosslang import BENCHES, xu_src  # noqa: E402
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from companion_repos import project_root
-# BOUNDARY: the default full O0–O3 appendix uses the frozen primer and is
-# oracle-only.  A hosted/product sweep is run through bench_opt_levels.sh with
-# an explicit --xu; this helper never upgrades primer timings to product proof.
-LANE = "oracle"
-_BOOT_CANDIDATES = (
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu",
-    project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe",
-)
-BOOT_XU = next((candidate for candidate in _BOOT_CANDIDATES if candidate.is_file()), _BOOT_CANDIDATES[0])
-# This helper is an oracle-only timings appendix.  Keep explicit overrides
-# tied to the reproducible Gen0 artifacts; hosted/product sweeps belong to
-# bench_opt_levels.py's product lane.
-FROZEN_PRIMER_PATHS = frozenset(
-    {
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "debug" / "xu.exe").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu").absolute(),
-        (project_root("bootstrap", core_root=ROOT) / "target" / "release" / "xu.exe").absolute(),
-    }
-)
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+LANE = "product"
 SNAPSHOT = BENCH_ROOT / "reports" / "bench_opt_levels.latest.txt"
-TIMINGS_MARK = "## xu primer --timings"
+TIMINGS_MARK = "## xu product --timings"
 OPTS = (0, 1, 2, 3)
 DIGEST_HEADINGS = (
     "## wall median ms",
@@ -62,52 +41,6 @@ def ensure_xupath() -> None:
         os.environ["XUPATH"] = src if not cur else f"{src}:{cur}"
 
 
-def _lexical_path(path: Path) -> Path:
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = Path.cwd() / candidate
-    return candidate.absolute()
-
-
-def _has_symlink_component(path: Path) -> bool:
-    candidate = _lexical_path(path)
-    owner = project_root("bootstrap", core_root=ROOT)
-    if not candidate.is_relative_to(owner):
-        owner = ROOT
-    try:
-        relative = candidate.relative_to(owner)
-    except ValueError:
-        return False
-    if owner.is_symlink():
-        return True
-    current = owner
-    for part in relative.parts:
-        current /= part
-        try:
-            if current.is_symlink():
-                return True
-        except OSError:
-            return True
-    return False
-
-
-def is_frozen_primer(path: Path) -> bool:
-    """Accept only an exact, non-symlink canonical Gen0 artifact."""
-
-    lexical = _lexical_path(path)
-    if (
-        lexical not in FROZEN_PRIMER_PATHS
-        or _has_symlink_component(lexical)
-        or not lexical.is_file()
-        or not os.access(lexical, os.X_OK)
-    ):
-        return False
-    try:
-        return lexical.resolve() == lexical
-    except (OSError, RuntimeError):
-        return False
-
-
 def parse_timings(blob: str) -> dict[str, str] | None:
     m = re.search(
         r"timings:\s*load=(\d+)ms parse=(\d+)ms check=(\d+)ms "
@@ -123,10 +56,10 @@ def parse_timings(blob: str) -> dict[str, str] | None:
 def snapshot_benches(path: Path, xu: Path):
     from bench_snapshot_identity import metadata, compiler_sha256
     saved = metadata(path)
-    if saved.get("lane") != "oracle":
-        raise SystemExit("oracle snapshot required for primer timings")
+    if saved.get("lane") != "product":
+        raise SystemExit("product snapshot required for hosted timings")
     if saved.get("xu_sha256") != compiler_sha256(xu):
-        raise SystemExit("snapshot compiler SHA differs from primer")
+        raise SystemExit("snapshot compiler SHA differs from product compiler")
     names = [n.strip() for n in saved.get("benches", "").split(",") if n.strip()]
     by_name = {b.name: b for b in BENCHES}
     if not names or any(n not in by_name for n in names):
@@ -137,7 +70,7 @@ def snapshot_benches(path: Path, xu: Path):
 def run_xu_timings(xu: Path, benches) -> str:
     ensure_xupath()
     lines = [
-        f"{TIMINGS_MARK} (one shot per -On; primer {xu})",
+        f"{TIMINGS_MARK} (one shot per -On; product {xu})",
         f"{'bench':<18} {'opt':<4} "
         f"{'load':>6} {'parse':>6} {'check':>6} {'mir':>6} {'emit':>6} "
         f"{'bin':>6} {'total':>6}",
@@ -151,7 +84,7 @@ def run_xu_timings(xu: Path, benches) -> str:
             for opt in OPTS:
                 out = tmp / f"{bench.name}.O{opt}.xin"
                 p = subprocess.run(
-                    [str(xu), "--timings", f"-O{opt}", str(src), "-o", str(out)],
+                    [str(HOSTED_RUNNER), str(xu), "build", "--timings", f"-O{opt}", str(src), "-o", str(out)],
                     capture_output=True,
                     text=True,
                 )
@@ -230,21 +163,13 @@ def main() -> int:
     ap.add_argument("--snapshot", type=Path, default=SNAPSHOT)
     ap.add_argument("--append-timings", action="store_true")
     ap.add_argument("--digest", action="store_true")
-    ap.add_argument("--xu", type=Path, default=BOOT_XU)
+    ap.add_argument("--xu", type=Path, default=None)
     args = ap.parse_args()
     snap = args.snapshot
     if args.append_timings:
-        raw_xu = args.xu.expanduser()
-        xu = raw_xu.resolve()
+        xu = resolve_hosted_compiler(args.xu)
         if not xu.is_file() or not os.access(xu, os.X_OK):
             print(f"bench_opt_full: missing xu {xu}", file=sys.stderr)
-            return 1
-        if not is_frozen_primer(raw_xu):
-            print(
-                "bench_opt_full: oracle timings require the frozen bootstrap "
-                "primer (bootstrap/target/{debug,release}/xu[.exe])",
-                file=sys.stderr,
-            )
             return 1
         benches = snapshot_benches(snap, xu)
         block = run_xu_timings(xu, benches)

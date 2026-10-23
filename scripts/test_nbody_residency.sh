@@ -19,7 +19,7 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
-XU=$(XU_ALLOW_ORACLE_SEED=0 XU_SEED="$XU_INPUT" "$HOST_SEED_RESOLVER")
+XU=$(XU_SEED="$XU_INPUT" "$HOST_SEED_RESOLVER")
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 for mode in O1 O2 O3 nrc; do
