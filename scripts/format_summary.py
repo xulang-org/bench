@@ -87,6 +87,15 @@ def parse_crosslang_txt(content: str) -> dict:
     return results
 
 
+def parse_toolchains(content: str) -> dict:
+    """Keep versions from the same raw measurement log, never the import host."""
+    versions = {}
+    for name in ("clang", "rustc", "go", "swiftc"):
+        match = re.search(r"^# " + name + r": (.+)$", content, re.M)
+        versions[name] = match.group(1).strip() if match else None
+    return versions
+
+
 def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
     meta = meta or {}
     benches = []
@@ -144,6 +153,7 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
             "xu_version": meta.get("xu_version", "0.8.8"),
             "total_benches": len(benches),
             "rss_method": meta.get("rss_method", "unrecorded"),
+            "toolchains": meta.get("toolchains", {}),
             "methodology": "Whole-program wall time, 7 iterations median; Linux RSS from separate post-exec tracing, macOS wait4, Windows peak working set; verified stdout",
         },
         "categories": {k: {"zh": v[0], "en": v[1]} for k, v in CATEGORY_NAMES.items()},
@@ -170,6 +180,9 @@ def generate_markdown_summary(payload: dict) -> str:
         "|---|---:|---:|---:|---:|---|",
     ]
 
+    versions = meta.get("toolchains", {})
+    lines[8:8] = [f"- **{name}**: `{versions.get(name) or 'not available in this run'}`"
+                  for name in ("clang", "rustc", "go", "swiftc")]
     key_benches = ["startup", "chan_ping", "loop_sum", "matmul", "sroa_vec3", "aes128_encrypt"]
     for kb in key_benches:
         item = next((b for b in benches if b["name"] == kb), None)
@@ -242,6 +255,9 @@ def generate_multi_arch_summary(aggregated: dict) -> str:
     ])
 
     # Table comparing key benches across platforms
+    versions = meta.get("toolchains", {})
+    lines[8:8] = [f"- **{name}**: `{versions.get(name) or 'not available in this run'}`"
+                  for name in ("clang", "rustc", "go", "swiftc")]
     key_benches = ["startup", "loop_sum", "fib", "matmul", "sroa_vec3", "chan_ping", "aes128_encrypt"]
     header = "| 核心负载 | 说明 |" + "".join(f" {pid} |" for pid in platforms.keys())
     separator = "|---|---|" + "".join("---:|" for _ in platforms)
@@ -348,6 +364,7 @@ def main():
     content = args.input.read_text(encoding="utf-8")
     parsed = parse_crosslang_txt(content)
     meta = {
+        "toolchains": parse_toolchains(content),
         "rss_method": (re.search(r"^# rss_method: (.+)$", content, re.M).group(1)
                        if re.search(r"^# rss_method: (.+)$", content, re.M) else "unrecorded"),
         "xu_version": args.xu_version,
