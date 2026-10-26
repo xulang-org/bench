@@ -254,10 +254,15 @@ def generate_multi_arch_summary(aggregated: dict) -> str:
         "",
     ])
 
-    # Table comparing key benches across platforms
-    versions = meta.get("toolchains", {})
-    lines[8:8] = [f"- **{name}**: `{versions.get(name) or 'not available in this run'}`"
-                  for name in ("clang", "rustc", "go", "swiftc")]
+    # Versions belong to each measured platform, not the aggregation host.
+    lines.extend(["", "### 编译工具链版本 / Measured toolchains", "",
+                  "| Platform | Clang | Rust | Go | Swift |", "|---|---|---|---|---|"])
+    for pid, data in platforms.items():
+        versions = data.get("metadata", {}).get("toolchains", {})
+        values = [versions.get(name) or "unavailable" for name in ("clang", "rustc", "go", "swiftc")]
+        lines.append("| " + " | ".join([pid, *values]) + " |")
+    lines.append("")
+
     key_benches = ["startup", "loop_sum", "fib", "matmul", "sroa_vec3", "chan_ping", "aes128_encrypt"]
     header = "| 核心负载 | 说明 |" + "".join(f" {pid} |" for pid in platforms.keys())
     separator = "|---|---|" + "".join("---:|" for _ in platforms)
