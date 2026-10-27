@@ -8,7 +8,7 @@
 
 - **单线程**同算法直译；禁止手写 SIMD / unsafe / OpenMP / goroutine 冲榜写法。
 - `argv[1]` = N；缺省用 perf N（便于手跑）。
-- verify：小 N，stdout 与 `golden/`（官方 download）逐字节一致。
+- verify：小 N，stdout 与 [`golden/`](golden/README.md) 逐字节一致；该目录记录官方输出下载链接、SHA-256 与上游许可。
 - perf：大 N；报 **median + best** wall、**median 峰值 RSS**、**median CPU**；默认 `--sample-ms=5` 写出 RSS 时间曲线（CSV + SVG）。
 - `nbody` 用 `[5]Body`（与 `cross/nbody.rs` / C `sys[5]` 同构）。`fannkuchredux` 用 `[12]int`。
 
@@ -27,6 +27,8 @@ Wave 2（未实现）：`revcomp` / `knucleotide` / `pidigits` / `regexredux`。
 
 ## 跑法
 
+从仓库根目录执行；环境准备见[根 README](../../../README.md)。
+
 ```bash
 make game
 # 或
@@ -36,4 +38,4 @@ python3 scripts/bench_game.py --benches=nbody,spectralnorm --quick
 python3 scripts/bench_game.py --out /tmp/g.txt --discard-first --iters=5
 ```
 
-报告：[`reports/game.md`](../../../reports/game.md)
+报告：[`reports/game.md`](../../../reports/game.md)（运行 `make game` 后生成）。

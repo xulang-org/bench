@@ -1,21 +1,30 @@
 # Xu 基准与横测
 
-完整基准套件的独立仓库：语言能力、标准库、优化档、编译时间、
+Xu 基准工具与负载的独立仓库：选定的语言能力、标准库、优化档、编译时间、
 Benchmarks Game、Clang 差距、资源曲线与 stdout 金标。
 
 默认与 `xu` 放在同级目录；可通过 `XU_ROOT=/path/to/xu` 选择编译器源码仓库。
 编译器与标准库仍由 Xu 仓库构建，本仓库维护负载、对照实现和测量方法。
-全部基准通过 Xu 的 hosted seed resolver 与 hermetic wrapper 编译，
-只依赖产品编译器；运行时对拍比较同一编译器的 O0 与默认优化结果。
+Xu 负载通过 Xu 的 hosted seed resolver 选择产品编译器，并通过 hermetic
+wrapper 编译；跨语言对照还需要相应语言的工具链。运行时对拍比较同一
+编译器的 O0 与默认优化结果。这些负载的结果仅代表所测输入与环境。
+
+从本仓库根目录执行以下命令。需要 Make、Python 3、Bash；`make test` 另需
+`pytest`（可在虚拟环境中用 `python3 -m pip install pytest` 安装）。
+实际编译 Xu 负载前，须在 `XU_ROOT` 中准备可执行的 hosted 产品编译器
+（通常为 `bin/xu`；参见 [Xu 仓库说明](https://github.com/xulang-org/xu)）；列出负载和运行
+Python 测试不需要先构建 Xu。跨语言测试按已安装的 Clang、Rust、Go、
+Swift 等工具链运行可用对照，报告中的缺失项不能视为测量结果。
 
 ```sh
+export XU_ROOT="${XU_ROOT:-$(cd ../xu && pwd)}"
 make list
 make crosslang ARGS="--quick --benches=loop_sum --iters=1 --sample-ms=0"
 make game ARGS="--verify-only --benches=nbody"
-make stdlib ARGS="--bench=rand_read --iters=1"
-make opt-levels ARGS="--xu=../xu/bin/xu --quick --check"
+bash scripts/bench_stdlib.sh --benches=rand_read --iters=1
+make opt-levels ARGS="--quick --check"
 python3 scripts/bench_clang_gap_manifest.py
-python3 -m pytest tests scripts/test_bench_game.py
+make test
 ```
 
 更多负载说明见 [套件索引](tests/bench/README.md)。
@@ -43,3 +52,9 @@ macOS 使用 `wait4` 的峰值 RSS，Windows 使用 `PeakWorkingSetSize`。
 RSS 描述目标进程本身，不合计子进程；原生负载只允许一次 exec。
 实时 RSS 曲线来自计时进程的实际轮询，不用另一次运行的峰值补点。
 不同负载的资源范围只用于描述，不能按范围下限判定某语言整体最优。
+
+## 许可
+
+本仓库自有工具、负载与对照实现采用 [MIT 许可证](LICENSE)。第三方材料保留
+其原有版权与许可；Benchmarks Game 金标输出的来源、校验值和上游许可见
+[golden 说明](tests/bench/game/golden/README.md)。
