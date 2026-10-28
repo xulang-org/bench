@@ -247,7 +247,7 @@ jobs:
 
   aggregate:
     name: Aggregate Multi-Arch Results
-    needs: benchmark
+    needs: [resolve-xu, benchmark]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -278,6 +278,36 @@ jobs:
             --merge-dir all-reports \
             --json-out reports/benchmarks-all.json \
             --summary-out reports/multi_arch_summary.md
+
+      - name: Require six complete platforms from the same Xu source
+        env:
+          EXPECTED_XU_COMMIT: ${{ needs.resolve-xu.outputs.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          expected = {"linux-arm64", "linux-x64", "macos-arm64", "macos-x64", "windows-arm64", "windows-x64"}
+          output = Path("reports/benchmarks-all.json")
+          payload = json.loads(output.read_text(encoding="utf-8"))
+          platforms = payload["platforms"]
+          assert set(platforms) == expected, f"incomplete platform matrix: {sorted(platforms)}"
+          cases = None
+          for target in sorted(expected):
+              rows = platforms[target]["benches"]
+              names = {row["name"] for row in rows}
+              assert names and len(names) == len(rows), f"empty/duplicate cases: {target}"
+              if cases is None:
+                  cases = names
+              assert names == cases, f"different case coverage: {target}"
+              assert all(row["xu_wall_ms"] > 0 and row["xu_bytes"] > 0 for row in rows), f"missing Xu results: {target}"
+              identity_file = Path("all-reports") / f"benchmark-reports-{target}" / "compiler-identity.json"
+              identity = json.loads(identity_file.read_text(encoding="utf-8"))
+              assert identity["target"] == target, f"wrong compiler target: {target}"
+              assert identity["xu_commit"] == os.environ["EXPECTED_XU_COMMIT"], f"mixed Xu source: {target}"
+          payload["metadata"]["xu_commit"] = os.environ["EXPECTED_XU_COMMIT"]
+          output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(f"Validated {len(expected)} platforms × {len(cases)} cases from one Xu commit")
+          PY
 
       - name: Publish Multi-Arch Step Summary
         run: |
