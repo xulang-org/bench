@@ -1,0 +1,34 @@
+name: Benchmark checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python and workload inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: bench
+      - uses: actions/checkout@v6
+        with:
+          repository: xulang-org/xu
+          ref: 15d2d511eb589118e706db3f289ae84ceceed9fd
+          path: xu
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install pytest
+      - name: Check tests and registered workloads
+        working-directory: bench
+        env:
+          XU_ROOT: ${{ github.workspace }}/xu
+        run: |
+          make test
+          make list

@@ -23,6 +23,7 @@
 | `algorithm_search` | 标准包二分查找热路径 | `sort.search_ints` | C `lower_bound` 同算法 |
 | `sha256_chain` | 链式 SHA-256 | `crypto/sha256` | Go `crypto/sha256`；C/Rust 同算法直译；Swift CryptoKit |
 | `chan_ping` | 缓冲 channel | `chan` + `xu` worker | Go goroutine+chan；Rust `sync_channel`+线程（模型不同，仅作参照） |
+| `http_concurrent` | HTTP 高并发端到端吞吐（16 并发 × 200 请求，自环回） | `net/http` server + 裸 TCP client | Go `net/http`+goroutine；Rust `std::net`+OS 线程（无 crate，server 手写最小子集） |
 | `math_bits` | 位计数/旋转/翻转热路径 | `math/bits` | arm64/x64 直接调用对齐 Clang 指令选择 |
 | `map_ops` | 20 万次 map 插入 + 查找 | 语言 `map` | Go map / C 开地址表 / Rust HashMap / Swift Dictionary |
 | `iface_sum` | 800 万次接口方法 | `struct@` 动态派发 | Go interface / C 函数指针表 / Rust `dyn Trait` / Swift protocol |

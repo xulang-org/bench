@@ -2,6 +2,8 @@
 
 请遵守 [XU GitHub 仓库管理规范](https://github.com/xulang-org/xulang-org/blob/main/.github/REPOSITORY_RULES.md)。日常任务从 `dev` 建分支并通过 PR 合回，正式交付进入 `main`；后台设置按 [配置清单](https://github.com/xulang-org/xulang-org/blob/main/.github/GITHUB_SETTINGS.md) 单独验收。
 
+XU 源码还须遵守 [XU 代码规范](https://github.com/xulang-org/xu/blob/main/.github/XU_CODING_STANDARDS.md)；涉及配套语言或跨语言接口时，按各语言工具链及其中的边界契约验证。
+
 根 `VERSION` 标识基准工具集合发行，测量结果必须另行记录实际编译器版本与来源。治理文件修订不冒充新的编译器或测量结果，不改写历史数据。
 
 ## 修改与验证

@@ -28,6 +28,12 @@ make test
 ```
 
 更多负载说明见 [套件索引](tests/bench/README.md)。
+
+`http_concurrent` 使用 16 个 worker，各执行 200 次自环回 HTTP 请求。
+每次请求建立新 TCP 连接，校验响应正文和固定校验和；Xu、Go、Rust 提供对照实现。
+Go 使用 `net/http`，Rust 使用标准库线程与最小 HTTP 服务，结果包含连接、调度和协议开销。
+该负载尚未进入官网统一多平台测量，不能混入已有正式数据的性能比值。
+
 `reports/`、曲线和运行产物仅本机保留，不提交。原语言仓库的 `docs/`
 评测记录留在原处；需要旧基线时显式传入其路径。
 `make compile` 默认要求 `reports/bench_compile.baseline.txt`，可以用

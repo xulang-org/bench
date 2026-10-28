@@ -163,6 +163,12 @@ BENCHES: list[Bench] = [
         "channel/调度",
         ("go", "rs"),
     ),
+    Bench(
+        "http_concurrent",
+        "3200\n35945209188\n",
+        "HTTP 高并发吞吐(自环回,16 并发 x 200 请求)",
+        ("go", "rs"),
+    ),
     Bench("map_ops", "20000100000\n", "哈希表插入/查找", CORE),
     Bench("iface_sum", "20000000\n", "接口动态派发", CORE),
     Bench("match_sum", "228000000\n24000000\n", "密集 match/switch", CORE, xu_opt_matrix=True),
