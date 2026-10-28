@@ -6,7 +6,11 @@ import subprocess
 import sys
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
-ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
+xu_env = os.environ.get("XU_ROOT")
+if xu_env and (Path(xu_env) / "scripts/xu_host_seed.sh").is_file():
+    ROOT = Path(xu_env).expanduser().resolve()
+else:
+    ROOT = (BENCH_ROOT.parent / "xu").resolve()
 PRODUCT_RUNNER = ROOT / "scripts/run_product_compiler.sh"
 
 

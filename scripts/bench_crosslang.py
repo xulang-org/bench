@@ -51,6 +51,7 @@ elif (BENCH_ROOT.parent / "xu").is_dir():
     ROOT = (BENCH_ROOT.parent / "xu").resolve()
 else:
     ROOT = Path(xu_env or BENCH_ROOT.parent / "xu").expanduser().resolve()
+os.environ["XU_ROOT"] = str(ROOT)
 
 sys.path.insert(0, str(ROOT / "scripts"))
 from product_compiler import resolve_product_compiler as resolve_hosted_compiler
@@ -437,10 +438,12 @@ def main():
         ["--target", args.xu_target] if args.xu_target else []
     )
     clang_arch_flags: list[str] = []
+    if sys.platform == "darwin" and Path("/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk").exists():
+        clang_arch_flags.extend(["-isysroot", "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"])
     if args.xu_target == "macos-arm64":
-        clang_arch_flags = ["-arch", "arm64"]
+        clang_arch_flags.extend(["-arch", "arm64"])
     elif args.xu_target == "macos-x64":
-        clang_arch_flags = ["-arch", "x86_64"]
+        clang_arch_flags.extend(["-arch", "x86_64"])
     want_debug_peers = args.full or not args.quick
     tmp = Path(tempfile.mkdtemp(prefix="xu_cross_"))
     # Swift's default module cache may live outside the writable workspace.

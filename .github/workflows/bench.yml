@@ -62,7 +62,6 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
-    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -75,7 +74,6 @@ jobs:
             arch_name: arm64
             pattern: "*linux-arm64*.tar.gz"
             archive_type: tar
-            allow_failure: false
 
           - name: Linux x86_64
             os: ubuntu-latest
@@ -85,7 +83,6 @@ jobs:
             arch_name: x86_64
             pattern: "*linux-x64*.tar.gz"
             archive_type: tar
-            allow_failure: false
 
           - name: macOS ARM64 (Apple Silicon)
             os: macos-latest
@@ -95,7 +92,6 @@ jobs:
             arch_name: arm64
             pattern: "*macos-arm64*.tar.gz"
             archive_type: tar
-            allow_failure: false
 
           - name: macOS x86_64 (Intel)
             os: macos-15-intel
@@ -105,7 +101,6 @@ jobs:
             arch_name: x86_64
             pattern: "*macos-x64*.tar.gz"
             archive_type: tar
-            allow_failure: true
 
           - name: Windows x86_64
             os: windows-latest
@@ -115,7 +110,6 @@ jobs:
             arch_name: x86_64
             pattern: "*windows-x64*.zip"
             archive_type: zip
-            allow_failure: false
 
           - name: Windows ARM64
             os: windows-11-arm
@@ -125,7 +119,6 @@ jobs:
             arch_name: arm64
             pattern: "*windows-arm64*.zip"
             archive_type: zip
-            allow_failure: true
 
     defaults:
       run:
@@ -255,7 +248,6 @@ jobs:
   aggregate:
     name: Aggregate Multi-Arch Results
     needs: benchmark
-    if: always()
     runs-on: ubuntu-latest
     defaults:
       run:
