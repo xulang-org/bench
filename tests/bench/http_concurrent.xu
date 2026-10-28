@@ -1,0 +1,184 @@
+@main
+
+#net
+#net/http
+#strconv
+#strings
+
+// HTTP high-concurrency throughput over a loopback server.
+//
+// 16 concurrent workers x 200 requests. Every request opens a fresh TCP
+// connection and sends "Connection: close", so all languages pay the same
+// connect/teardown cost and no keep-alive reuse can hide server differences.
+//
+// The server side uses each language's idiomatic HTTP server (Go: net/http,
+// Rust: std::net, Xu: net/http). The client side is raw TCP on every
+// language so the wire traffic is identical.
+//
+// stdout: completed request count, then the order-independent checksum
+// (sum of the per-worker FNV-1a-32 hashes over the response bodies).
+
+fn expected_body(seq int) string {
+    << "pong-" + strconv.itoa(seq) + "\n"
+}
+
+// FNV-1a 32-bit. Go and Rust wrap to 32 bits for free; Xu integers are i64,
+// so the mask keeps every step identical. Without it the product keeps
+// growing past 32 bits and wraps the i64 range instead.
+fn fnv_update(h int, body &string) int {
+    mut v := h
+    mut i := 0
+    while i < body.len {
+        v = ((v ^ (body[i] & 255)) * 16777619) & 4294967295
+        i += 1
+    }
+    << v
+}
+
+fn find_crlf_crlf(buf string) int {
+    mut i := 0
+    while i + 3 < buf.len {
+        if (buf[i] & 255) == 13 && (buf[i + 1] & 255) == 10 && (buf[i + 2] & 255) == 13 && (buf[i + 3] & 255) == 10 {
+            << i
+        }
+        i += 1
+    }
+    << -1
+}
+
+fn content_length_of(head &string) int {
+    h := head + ""
+    idx := strings.index_of(&h, "Content-Length: ")
+    if idx < 0 { << -1 }
+    rest := h[(idx + 16):h.len]
+    mut end := 0
+    while end < rest.len {
+        c := rest[end] & 255
+        if c < 48 || c > 57 { <- }
+        end += 1
+    }
+    num := rest[0:end]
+    << strconv.atoi(&num) or (err) { << -1 }
+}
+
+// One request on a fresh connection. The response body length comes from the
+// Content-Length header, so the read loop never depends on EOF ordering.
+fn fetch(addr string, seq int) string {
+    fd := net.dial_ns(addr + "", 5000000000) or (err) { << "" }
+    req := "GET /r/" + strconv.itoa(seq) + " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+    net.conn_write(fd, &req) or (err) {
+        net.conn_close(fd) or (err) { << "" }
+        << ""
+    }
+    mut buf := ""
+    mut header_end := -1
+    mut content_length := -1
+    mut body := ""
+    mut done := false
+    while !done {
+        mut part := ""
+        mut ok := true
+        part = net.conn_read(fd, 65536) or (err) { ok = false
+            << "" }
+        if !ok { <- }
+        if part.len == 0 { <- }
+        buf = buf + part
+        if header_end < 0 {
+            header_end = find_crlf_crlf(buf + "")
+            if header_end >= 0 {
+                head := buf[0:header_end]
+                content_length = content_length_of(&head)
+            }
+        }
+        if header_end >= 0 && content_length >= 0 {
+            need := header_end + 4 + content_length
+            if buf.len >= need {
+                body = buf[(header_end + 4):need]
+                done = true
+            }
+        }
+    }
+    net.conn_close(fd) or (err) { << body }
+    << body
+}
+
+fn worker(addr string, base int, out chan int) {
+    mut h := 2166136261
+    mut i := 0
+    mut failed := false
+    while i < 200 && !failed {
+        seq := base + i
+        body := fetch(addr + "", seq)
+        want := expected_body(seq)
+        if body != want {
+            failed = true
+            <-
+        }
+        h = fnv_update(h, &body)
+        i += 1
+    }
+    if failed {
+        out <- -1
+    } else {
+        out <- h
+    }
+}
+
+fn seq_of(path &string) int {
+    seq_text := strings.trim_prefix(path, "/r/")
+    << strconv.atoi(&seq_text) or (err) { << 0 }
+}
+
+fn handler(c http.Context) {
+    path := c.path()
+    body := expected_body(seq_of(&path))
+    c.text(200, body) or (err) { << }
+}
+
+fn serve(lfd int) {
+    http.serve_listener(lfd, handler) or (err) { << }
+}
+
+fn try_listen(addr string) int {
+    << net.listen(addr) or (err) { << -1 }
+}
+
+fn main() int {
+    // net/http has no getsockname, so pick a loopback port by rotation.
+    mut port := 19901
+    mut tries := 0
+    mut lfd := -1
+    while lfd < 0 && tries < 64 {
+        addr := "127.0.0.1:" + strconv.itoa(port)
+        lfd = try_listen(addr + "")
+        if lfd < 0 { port += 1 }
+        tries += 1
+    }
+    if lfd < 0 {
+        println("no loopback port")
+        << 1
+    }
+    addr := "127.0.0.1:" + strconv.itoa(port)
+    xu serve(lfd)
+    out := chan int{cap: 16}
+    mut w := 0
+    while w < 16 {
+        xu worker(addr + "", w * 200, out)
+        w += 1
+    }
+    mut sum := 0
+    mut got := 0
+    mut failed := 0
+    while got < 16 {
+        v := <-out
+        if v < 0 { failed += 1 } else { sum += v }
+        got += 1
+    }
+    if failed > 0 {
+        println("request failure")
+        << 1
+    }
+    println(3200)
+    println(sum)
+    << 0
+}
