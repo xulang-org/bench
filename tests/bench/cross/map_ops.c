@@ -3,6 +3,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_MSC_VER)
+#define NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define NOINLINE __attribute__((noinline))
+#else
+#define NOINLINE
+#endif
+
 typedef struct {
     int64_t *keys;
     int64_t *vals;
@@ -11,8 +19,17 @@ typedef struct {
     int64_t cap;
 } Map;
 
+static inline uint64_t splitmix64(uint64_t x) {
+    x ^= x >> 30;
+    x *= 0xbf58476d1ce4e5b9ULL;
+    x ^= x >> 27;
+    x *= 0x94d049bb133111ebULL;
+    x ^= x >> 31;
+    return x;
+}
+
 static uint64_t mix(int64_t k, int64_t cap) {
-    return ((uint64_t)k * 11400714819323198485ull) & ((uint64_t)cap - 1);
+    return splitmix64((uint64_t)k) & ((uint64_t)cap - 1);
 }
 
 static void map_reinsert(Map *m, int64_t k, int64_t v) {
@@ -50,7 +67,7 @@ static void map_grow(Map *m) {
     free(oused);
 }
 
-static void map_put(Map *m, int64_t k, int64_t v) {
+NOINLINE static void map_put(Map *m, int64_t k, int64_t v) {
     if ((m->n + 1) * 2 >= m->cap) {
         map_grow(m);
     }
@@ -69,7 +86,7 @@ static void map_put(Map *m, int64_t k, int64_t v) {
     m->n += 1;
 }
 
-static int64_t map_get(Map *m, int64_t k) {
+NOINLINE static int64_t map_get(Map *m, int64_t k) {
     uint64_t i = mix(k, m->cap);
     uint64_t mask = (uint64_t)m->cap - 1;
     while (m->used[i]) {
