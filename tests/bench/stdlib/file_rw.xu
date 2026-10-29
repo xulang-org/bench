@@ -16,7 +16,7 @@ fn checksum(s string) int {
 fn main() int {
     dir := os.mkdir_temp("", "xu-stdlib-rw-") or (err) {
         println("m")
-        << 0
+        << 1
     }
     dir_copy := dir + ""
     mut path_parts := []string{}
@@ -63,7 +63,7 @@ fn main() int {
     while i < 128 {
         n := f.write(payload) or (err) {
             println("f")
-            << 0
+            << 1
         }
         total += n
         i += 1
