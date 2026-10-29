@@ -6,8 +6,8 @@
 fn main() int {
     base := "The quick brown fox jumps over the lazy dog 0123456789 ABCDEFGHIJKLMNOP"
     payload := strings.repeat(&base, 8)
-    mut total := 0
-    mut i := 0
+    $total := 0
+    $i := 0
     while i < 25000 {
         enc := hex.encode_to_string(payload)
         enc_len := enc.len

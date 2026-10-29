@@ -4,14 +4,14 @@
 
 // Stdlib compute: chained sha256 over a ~58KB body, 4 rounds.
 fn main() int {
-    mut body := ""
-    mut i := 0
+    $body := ""
+    $i := 0
     while i < 1024 {
         body.push_str("The quick brown fox jumps over the lazy dog. 0123456789.")
         i += 1
     }
-    mut h := sha256.sum256(body + "")
-    mut r := 0
+    $h := sha256.sum256(body + "")
+    $r := 0
     while r < 4 {
         h = sha256.sum256(h + body)
         r += 1

@@ -6,18 +6,18 @@
 fn main() int {
     seed := "buffer-io-"
     payload := strings.repeat(&seed, 1024) + "payload"
-    mut total := 0
-    mut i := 0
-    mut out_len := payload.len * 2
+    $total := 0
+    $i := 0
+    $out_len := payload.len * 2
     while i < 2000 {
-        mut src := io.cursor(payload + payload)
+        $src := io.cursor(payload + payload)
         out := src.read_n(out_len)
         total += out.len
         if out.len > 0 {
             total += out[0] + out[out.len - 1]
         }
 
-        mut mc := io.multi_cursor("alpha", "beta", "gamma", "delta", "epsilon", "zeta")
+        $mc := io.multi_cursor("alpha", "beta", "gamma", "delta", "epsilon", "zeta")
         total += mc.read_n(7).len
         total += mc.read_n(11).len
         total += mc.read_n(13).len

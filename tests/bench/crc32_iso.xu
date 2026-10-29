@@ -3,9 +3,9 @@
 // CRC-32 (IEEE 802.3) byte stream throughput.
 fn main() int {
     n := 100000
-    mut data := []int{}
-    mut seed := 123456789
-    mut i := 0
+    $data := []int{}
+    $seed := 123456789
+    $i := 0
     while i < n {
         seed = (seed * 1103515245 + 12345) & 2147483647
         data.push(seed & 255)
@@ -13,15 +13,15 @@ fn main() int {
     }
     poly := 3988292384
     mask32 := 4294967295
-    mut total := 0
-    mut round := 0
+    $total := 0
+    $round := 0
     while round < 20 {
-        mut crc := mask32
-        mut k := 0
+        $crc := mask32
+        $k := 0
         while k < n {
             b := data[k]
             crc = crc ^ b
-            mut bit := 0
+            $bit := 0
             while bit < 8 {
                 if (crc & 1) != 0 {
                     crc = ((crc >> 1) & 2147483647) ^ poly

@@ -28,8 +28,8 @@ fn days_per_year() f64 {
 fn arg_n() int {
     a := args()
     if a.len > 1 {
-        mut n := 0
-        mut i := 0
+        $n := 0
+        $i := 0
         s := a[1]
         while i < s.len {
             c := s[i] & 255
@@ -48,22 +48,22 @@ fn arg_n() int {
 }
 
 fn f9(x f64) string {
-    mut v := x
-    mut out := ""
+    $v := x
+    $out := ""
     if v < 0.0 {
         out = "-"
         v = 0.0 - v
     }
-    mut whole := int(v)
-    mut frac := v - f64(whole)
-    mut digits := int(frac * 1000000000.0 + 0.5)
+    $whole := int(v)
+    $frac := v - f64(whole)
+    $digits := int(frac * 1000000000.0 + 0.5)
     if digits >= 1000000000 {
         whole += 1
         digits = digits - 1000000000
     }
     out = out + str(whole) + "."
-    mut pow := 100000000
-    mut d := digits
+    $pow := 100000000
+    $d := digits
     while pow > 0 {
         q := d / pow
         out = out + str(q)
@@ -74,10 +74,10 @@ fn f9(x f64) string {
 }
 
 fn energy(sys &[]Body) f64 {
-    mut e := 0.0
+    $e := 0.0
     for i in 0:5 {
         e += 0.5 * sys[i].mass * (sys[i].vx * sys[i].vx + sys[i].vy * sys[i].vy + sys[i].vz * sys[i].vz)
-        mut j := i + 1
+        $j := i + 1
         while j < 5 {
             dx := sys[i].x - sys[j].x
             dy := sys[i].y - sys[j].y
@@ -90,10 +90,10 @@ fn energy(sys &[]Body) f64 {
     << e
 }
 
-fn offset_momentum(sys &mut []Body) {
-    mut px := 0.0
-    mut py := 0.0
-    mut pz := 0.0
+fn offset_momentum(sys $&[]Body) {
+    $px := 0.0
+    $py := 0.0
+    $pz := 0.0
     for i in 0:5 {
         px += sys[i].vx * sys[i].mass
         py += sys[i].vy * sys[i].mass
@@ -105,9 +105,9 @@ fn offset_momentum(sys &mut []Body) {
     sys[0].vz = 0.0 - pz / sm
 }
 
-fn advance(sys &mut []Body, dt f64) {
+fn advance(sys $&[]Body, dt f64) {
     for i in 0:5 {
-        mut j := i + 1
+        $j := i + 1
         while j < 5 {
             dx := sys[i].x - sys[j].x
             dy := sys[i].y - sys[j].y
@@ -137,17 +137,17 @@ fn main() int {
     n := arg_n()
     sm := solar_mass()
     dpy := days_per_year()
-    mut sys := []Body{}
+    $sys := []Body{}
     sys.push(Body{x: 0.0, y: 0.0, z: 0.0, vx: 0.0, vy: 0.0, vz: 0.0, mass: sm})
     sys.push(Body{x: 4.84143144246472090e+00, y: 0.0 - 1.16032004402742839e+00, z: 0.0 - 1.03622044471123109e-01, vx: 1.66007664274403694e-03 * dpy, vy: 7.69901118419740425e-03 * dpy, vz: 0.0 - 6.90460016972063023e-05 * dpy, mass: 9.54791938424326609e-04 * sm})
     sys.push(Body{x: 8.34336671824457987e+00, y: 4.12479856412430479e+00, z: 0.0 - 4.03523417114321381e-01, vx: 0.0 - 2.76742510726862411e-03 * dpy, vy: 4.99852801234917238e-03 * dpy, vz: 2.30417297573763929e-05 * dpy, mass: 2.85885980666130812e-04 * sm})
     sys.push(Body{x: 1.28943695621391310e+01, y: 0.0 - 1.51111514016986312e+01, z: 0.0 - 2.23307578892655734e-01, vx: 2.96460137564761618e-03 * dpy, vy: 2.37847173959480950e-03 * dpy, vz: 0.0 - 2.96589568540237556e-05 * dpy, mass: 4.36624404335156298e-05 * sm})
     sys.push(Body{x: 1.53796971148509165e+01, y: 0.0 - 2.59193146099879641e+01, z: 1.79258772950371181e-01, vx: 2.68067772490389322e-03 * dpy, vy: 1.62824170038242295e-03 * dpy, vz: 0.0 - 9.51592254519715870e-05 * dpy, mass: 5.15138902046611451e-05 * sm})
-    offset_momentum(mut &sys)
+    offset_momentum($&sys)
     println(f9(energy(&sys)))
-    mut i := 0
+    $i := 0
     while i < n {
-        advance(mut &sys, 0.01)
+        advance($&sys, 0.01)
         i += 1
     }
     println(f9(energy(&sys)))

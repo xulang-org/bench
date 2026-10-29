@@ -79,7 +79,7 @@ def translate(body, lang):
         if not line or line.startswith('//'): continue
         line = line.replace('[]int{}', 'EMPTY')
         line = line.replace('string_from_bytes(s)', 's')
-        line = line.replace('mut &s', {'c':'s','go':'s','rs':'&mut s','swift':'&s'}[lang])
+        line = line.replace('$&s', {'c':'s','go':'s','rs':'&mut s','swift':'&s'}[lang])
         for var in ('key','src'):
             line = line.replace(var + '.len', {'c':var+'.len','go':'int64(len('+var+'))','rs':var+'.len() as i64','swift':var+'.count'}[lang])
         m = re.fullmatch(r'for (\w+) in 0:(.+) \{',line)
@@ -90,7 +90,7 @@ def translate(body, lang):
                     'rs':f'for {var} in 0i64..({bound}) {{',
                     'swift':f'for {var} in 0..<({bound}) {{'}[lang]
         else:
-            m = re.fullmatch(r'(mut )?(\w+) := (.+)',line)
+            m = re.fullmatch(r'(\$)?(\w+) := (.+)',line)
             if m:
                 mut, var, expr = m.groups()
                 array = expr == 'EMPTY' or expr.startswith('load16(')
@@ -229,9 +229,9 @@ func aes_bench(_ bits:Int,_ op:Int) {
                 xu=f'''@main
 #crypto/aes
 fn main() int {{
-    mut key := make_string({bits//8})
+    $key := make_string({bits//8})
     for j in 0:key.len {{key[j]=j}}
-    mut checksum:=0
+    $checksum:=0
     for i in 0:{N_KEYS} {{
         key[0]=i&255
         c:=aes.new_cipher(&key) or (err) {{<<1}}
@@ -254,7 +254,7 @@ fn main() int {{
 fn main() int {{
     key:=hex.decode_string("{key.hex()}") or (err) {{<<1}}
     c:=aes.new_cipher(&key) or (err) {{<<1}}
-    mut block:=hex.decode_string("{PT.hex()}") or (err) {{<<1}}
+    $block:=hex.decode_string("{PT.hex()}") or (err) {{<<1}}
     for i in 0:{N_BLOCKS} {{block=c.{tag}(&block) or (err) {{<<1}}}}
     println(hex.encode_to_string(block))
     <<0

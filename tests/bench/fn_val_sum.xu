@@ -7,8 +7,8 @@ fn bump(x int) int {
 
 fn main() int {
     f := bump
-    mut s := 0
-    mut i := 0
+    $s := 0
+    $i := 0
     while i < 8000000 {
         s += f(i & 7)
         i += 1

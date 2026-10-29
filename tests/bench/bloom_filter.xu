@@ -6,9 +6,9 @@ struct BloomFilter {
 }
 
 fn new_bloom(num_bits int) BloomFilter {
-    mut b := []int{}
+    $b := []int{}
     words := num_bits / 64
-    mut i := 0
+    $i := 0
     while i < words {
         b.push(0)
         i += 1
@@ -16,10 +16,10 @@ fn new_bloom(num_bits int) BloomFilter {
     << BloomFilter{bits: b, mask: num_bits - 1}
 }
 
-fn (bf &mut BloomFilter) add(val int) {
+fn (bf $&BloomFilter) add(val int) {
     h1 := (val * 1103515245 + 12345) & 2147483647
     h2 := (val * 1664525 + 1013904223) & 2147483647
-    mut i := 0
+    $i := 0
     while i < 4 {
         bit := (h1 + i * h2) & bf.mask
         word_idx := bit >> 6
@@ -32,7 +32,7 @@ fn (bf &mut BloomFilter) add(val int) {
 fn (bf &BloomFilter) contains(val int) bool {
     h1 := (val * 1103515245 + 12345) & 2147483647
     h2 := (val * 1664525 + 1013904223) & 2147483647
-    mut i := 0
+    $i := 0
     while i < 4 {
         bit := (h1 + i * h2) & bf.mask
         word_idx := bit >> 6
@@ -46,11 +46,11 @@ fn (bf &BloomFilter) contains(val int) bool {
 }
 
 fn main() int {
-    mut bf := new_bloom(1048576)
-    mut seed := 123456789
+    $bf := new_bloom(1048576)
+    $seed := 123456789
 
     // Insert 200,000 elements
-    mut i := 0
+    $i := 0
     while i < 200000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
         bf.add(seed)
@@ -58,7 +58,7 @@ fn main() int {
     }
 
     // Query 2,000,000 elements
-    mut checksum := 0
+    $checksum := 0
     i = 0
     while i < 2000000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647

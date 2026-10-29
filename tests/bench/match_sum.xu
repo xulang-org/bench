@@ -2,8 +2,8 @@
 
 // Dense 8-way match in a counted loop (jump table / branch).
 fn main() int {
-    mut s := 0
-    mut i := 0
+    $s := 0
+    $i := 0
     while i < 24000000 {
         k := i & 7
         match k {

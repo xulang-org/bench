@@ -3,8 +3,8 @@
 #crypto/rand
 
 fn main() int {
-    mut total := 0
-    mut i := 0
+    $total := 0
+    $i := 0
     while i < 256 {
         chunk := crypto.rand.read(2048) or (err) {
             println("r")
