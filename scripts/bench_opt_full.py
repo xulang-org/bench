@@ -17,7 +17,7 @@ from bench_crosslang import BENCHES, xu_src  # noqa: E402
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER, product_compile_argv
 LANE = "product"
 SNAPSHOT = BENCH_ROOT / "reports" / "bench_opt_levels.latest.txt"
 TIMINGS_MARK = "## xu product --timings"
@@ -84,7 +84,7 @@ def run_xu_timings(xu: Path, benches) -> str:
             for opt in OPTS:
                 out = tmp / f"{bench.name}.O{opt}.xin"
                 p = subprocess.run(
-                    [str(HOSTED_RUNNER), str(xu), "build", "--timings", f"-O{opt}", str(src), "-o", str(out)],
+                    product_compile_argv(xu, "build", "--timings", f"-O{opt}", str(src), "-o", str(out), runner=HOSTED_RUNNER),
                     capture_output=True,
                     text=True,
                 )

@@ -79,8 +79,21 @@ class InterleavedSamplingTests(unittest.TestCase):
 
         with patch.object(levels, "run_one", side_effect=watchdog):
             self.measure({("xu", opt): Path(str(opt)) for opt in (1, 2, 3)}, iters=2)
-        self.assertEqual(observed[0], ("1", None))
+        self.assertEqual(observed[0], ("1", levels.INITIAL_TIMEOUT_S))
         self.assertTrue(all(timeout == 1.0 for _, timeout in observed[1:]))
+
+    def test_deadlocked_anchor_is_bounded_and_other_tiers_continue(self):
+        deadlines = []
+        def anchor_timeout(cmd, **kwargs):
+            deadlines.append(kwargs["timeout_s"])
+            if cmd[0] == "1":
+                return self.sample(wall=levels.INITIAL_TIMEOUT_S, rc=-9)
+            return self.sample()
+        with patch.object(levels, "run_one", side_effect=anchor_timeout):
+            rows, errors = self.measure({("xu", opt): Path(str(opt)) for opt in (1, 2)}, iters=2)
+        self.assertIn("TIMEOUT", errors[("xu", 1)])
+        self.assertIn(("xu", 2), rows)
+        self.assertTrue(all(timeout == levels.INITIAL_TIMEOUT_S for timeout in deadlines))
 
     def test_short_sampling_floor_applies_to_every_tier(self):
         for cpu, expected_runs in ((0.01, 10), (0.1, 6)):

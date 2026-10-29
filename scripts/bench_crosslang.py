@@ -18,7 +18,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import io
 import os
 import shutil
 import subprocess
@@ -29,10 +28,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if sys.platform == "win32":
-    if hasattr(sys.stdout, "buffer"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "buffer"):
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    # Rewrapping an existing buffer gives two streams ownership of the same
+    # descriptor and closes pytest's capture buffer when either is collected.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_rusage import (  # noqa: E402
@@ -54,7 +54,7 @@ else:
 os.environ["XU_ROOT"] = str(ROOT)
 
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, product_compile_argv
 CROSS = BENCH_ROOT / "tests" / "bench" / "cross"
 PRODUCT_XU = ROOT / "bin" / "xu"
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
@@ -521,26 +521,9 @@ def main():
         jobs.append((name, bench, cmd, out_bin))
 
     def xu_compile_argv(src: Path, flags: list[str], out: Path) -> list[str]:
-        if sys.platform == "win32" or not PRODUCT_RUNNER.is_file():
-            return [
-                str(xu_compiler),
-                "build",
-                str(src),
-                *xu_target_flags,
-                *flags,
-                "-o",
-                str(out),
-            ]
-        return [
-            str(PRODUCT_RUNNER),
-            str(xu_compiler),
-            "build",
-            str(src),
-            *xu_target_flags,
-            *flags,
-            "-o",
-            str(out),
-        ]
+        return product_compile_argv(xu_compiler, "build", str(src),
+                                    *xu_target_flags, *flags, "-o", str(out),
+                                    runner=PRODUCT_RUNNER)
 
     def add_xu(bench: Bench, flags: list[str], label: str, tag: str):
         out = tmp / f"xu_{bench.name}_{tag}{ext}"

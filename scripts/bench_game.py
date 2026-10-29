@@ -37,7 +37,7 @@ from bench_rusage import (  # noqa: E402
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER, product_compile_argv
 GAME = BENCH_ROOT / "tests" / "bench" / "game"
 CROSS = GAME / "cross"
 GOLDEN = GAME / "golden"
@@ -251,13 +251,13 @@ def compile_one(
     *,
     lane: str,
 ) -> Path | None:
-    out = tmp / f"{lang}_{bench.name}"
+    suffix = ".exe" if sys.platform == "win32" else ""
+    out = tmp / f"{lang}_{bench.name}{suffix}"
     if lang == "xu":
-        out = tmp / f"{lang}_{bench.name}"
         src = str(GAME / f"{bench.name}.xu")
         if lane != "product":
             raise ValueError(f"unsupported compiler lane: {lane}")
-        cmd = [str(PRODUCT_RUNNER), str(xu_bin), "build", src, "-o", str(out)]
+        cmd = product_compile_argv(xu_bin, "build", src, "-o", str(out), runner=PRODUCT_RUNNER)
     elif lang == "c":
         clang = tools.get("clang")
         if not clang:

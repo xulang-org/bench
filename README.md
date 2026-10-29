@@ -27,6 +27,23 @@ python3 scripts/bench_clang_gap_manifest.py
 make test
 ```
 
+Windows 原生 Python 的性能入口会通过 Git for Windows Bash 调用相同的隔离编译包装器，
+保留参数边界和编译器退出状态。请安装 Git for Windows，并确保 Bash 中的 `python3`
+指向可用的 Python 3 解释器。可从 PowerShell 直接运行：
+
+```powershell
+$env:XU_ROOT = (Resolve-Path ../xu).Path
+python scripts/bench_opt_levels.py --xu ../xu/bin/xu.exe --quick --check
+python scripts/bench_stdlib.py --xu ../xu/bin/xu.exe --iters=7 --discard-first
+python -m pytest tests scripts/test_bench_game.py
+```
+
+Windows 的 Xu 编译 wall time 包含隔离包装器开销。优化档报告中的编译 CPU/RSS
+显示为 `nan`（不可用）：Windows 进程计数只覆盖 Bash 本身，不能将其冒充编译器子进程。
+已生成的 Xu 程序仍直接执行，运行 CPU/RSS 按目标进程采集。
+优化档采样在建立 O1 基线前使用 60 秒超时，随后沿用相对 O1 的期限；首轮预热死锁
+会保留为失败样本，并继续检查其他配置。
+
 更多负载说明见 [套件索引](tests/bench/README.md)。
 
 `http_concurrent` 使用 16 个 worker，各执行 200 次自环回 HTTP 请求。
