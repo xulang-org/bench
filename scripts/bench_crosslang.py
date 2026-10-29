@@ -42,6 +42,7 @@ from bench_rusage import (  # noqa: E402
     write_curve_csv,
     write_rss_svg,
 )
+from bench_network import wait_for_loopback_capacity
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 xu_env = os.environ.get("XU_ROOT")
@@ -125,6 +126,7 @@ class Bench:
     face: str
     langs: tuple[str, ...]
     xu_opt_matrix: bool = False
+    loopback_connections: int = 0
 
 
 CORE = ("go", "c", "rs", "swift")
@@ -169,6 +171,7 @@ BENCHES: list[Bench] = [
         "3200\n35945209188\n",
         "HTTP 高并发吞吐(自环回,16 并发 x 200 请求)",
         ("go", "rs"),
+        loopback_connections=3200,
     ),
     Bench("map_ops", "20000100000\n", "哈希表插入/查找", CORE),
     Bench("iface_sum", "20000000\n", "接口动态派发", CORE),
@@ -227,6 +230,7 @@ def timed_runs(
     sample_interval_s: float | None = None,
     timeout_s: float | None = None,
     cwd: Path | None = None,
+    before_run=None,
 ) -> RunStats:
     """Wall best/median + median peak RSS + median CPU.
 
@@ -239,6 +243,8 @@ def timed_runs(
     out = ""
     total = n + (1 if discard_first else 0)
     for i in range(total):
+        if before_run is not None:
+            before_run()
         s = run_one(
             [path], sample_interval_s=None, timeout_s=timeout_s, cwd=cwd, verify_rss_output=True
         )
@@ -256,6 +262,8 @@ def timed_runs(
         out = text
     curve: tuple[tuple[float, float], ...] = ()
     if sample_interval_s is not None and sample_interval_s > 0:
+        if before_run is not None:
+            before_run()
         cs = run_one(
             [path],
             sample_interval_s=sample_interval_s,
@@ -639,6 +647,7 @@ def main():
                 sample_interval_s=sample_s,
                 timeout_s=timeout,
                 cwd=run_dirs[bench],
+                before_run=(lambda: wait_for_loopback_capacity(BY_NAME[bench].loopback_connections)) if BY_NAME[bench].loopback_connections else None,
             )
         except SystemExit as e:
             log(

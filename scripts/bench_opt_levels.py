@@ -49,6 +49,7 @@ from bench_crosslang import (  # noqa: E402
     xu_src,
 )
 from bench_rusage import peak_rss_method, run_one, sparkline, write_curve_csv, write_rss_svg  # noqa: E402
+from bench_network import wait_for_loopback_capacity
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
@@ -115,6 +116,7 @@ def timed_interleaved(
     expect: bytes,
     short_iters: int = 0,
     on_rounds=None,
+    before_run=None,
 ) -> tuple[dict[tuple[str, int], RunStats], dict[tuple[str, int], str]]:
     """Measure each tier once per round, rotating and reversing run order.
 
@@ -134,6 +136,8 @@ def timed_interleaved(
 
     def take(key, interval=None):
         nonlocal o1_s
+        if before_run is not None:
+            before_run()
         timeout = INITIAL_TIMEOUT_S
         # Keep watchdog/thread overhead identical for measured Xu tiers.
         # Before the O1 anchor exists, use a bounded calibration deadline.
@@ -733,6 +737,7 @@ def main() -> int:
             sample_interval_s=sample_s, cwd=run_dirs[bench.name], expect=expect,
             short_iters=21 if gate else 0,
             on_rounds=lambda count: log(f"# {bench.name}: {count} measured rounds per tier"),
+            before_run=(lambda: wait_for_loopback_capacity(bench.loopback_connections)) if bench.loopback_connections else None,
         )
         for (impl, opt), error in errors.items():
             log(f"  run FAIL {impl} {opt_label(opt)} {bench.name}: {error}")
