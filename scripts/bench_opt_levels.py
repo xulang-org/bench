@@ -145,7 +145,8 @@ def timed_interleaved(
             if timeout is not None and s.wall_s >= timeout:
                 errors[key] = f"TIMEOUT: {s.wall_s:.1f}s >= {timeout:.1f}s"
             else:
-                errors[key] = "run failed: " + s.stderr.decode("utf-8", "replace")[-400:]
+                diagnostic = (s.stderr or s.stdout).decode("utf-8", "replace")[-400:]
+                errors[key] = f"run failed (exit {s.returncode}): " + diagnostic
             return None
         if key not in mismatches:
             outputs[key] = s.stdout

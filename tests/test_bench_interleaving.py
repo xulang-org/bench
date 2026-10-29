@@ -82,6 +82,15 @@ class InterleavedSamplingTests(unittest.TestCase):
         self.assertEqual(observed[0], ("1", levels.INITIAL_TIMEOUT_S))
         self.assertTrue(all(timeout == 1.0 for _, timeout in observed[1:]))
 
+    def test_failure_reports_exit_status_and_stdout_when_stderr_is_empty(self):
+        failed = self.sample(stdout=b"request failure\n", rc=7)
+        failed.stderr = b""
+        with patch.object(levels, "run_one", return_value=failed):
+            rows, errors = self.measure({("xu", 1): Path("1")})
+        self.assertFalse(rows)
+        self.assertIn("exit 7", errors[("xu", 1)])
+        self.assertIn("request failure", errors[("xu", 1)])
+
     def test_deadlocked_anchor_is_bounded_and_other_tiers_continue(self):
         deadlines = []
         def anchor_timeout(cmd, **kwargs):
