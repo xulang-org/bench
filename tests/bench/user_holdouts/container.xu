@@ -4,8 +4,8 @@ fn choose(x int) int {
     << x * 5 - 11
 }
 fn consume(values &[]int, rounds int) int {
-    mut sum := 0
-    mut i := 0
+    $sum := 0
+    $i := 0
     while i < rounds {
         index := i % values.len
         value := values[index]

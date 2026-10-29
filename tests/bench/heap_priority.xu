@@ -3,12 +3,12 @@
 #container/heap as heap
 
 fn main() int {
-    mut h := heap.new_ints()
-    mut seed := 123456789
-    mut checksum := 0
+    $h := heap.new_ints()
+    $seed := 123456789
+    $checksum := 0
 
     // Phase 1: Push 200,000 elements
-    mut i := 0
+    $i := 0
     while i < 200000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
         h.push(seed)

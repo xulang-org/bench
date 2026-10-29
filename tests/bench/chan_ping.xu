@@ -2,7 +2,7 @@
 
 // Scheduler + channel throughput: 500k messages over a buffered chan.
 fn worker(ch chan int, n int) {
-    mut i := 0
+    $i := 0
     while i < n {
         ch <- i
         i += 1
@@ -12,8 +12,8 @@ fn worker(ch chan int, n int) {
 fn main() int {
     ch := chan int{cap: 64}
     xu worker(ch, 500000)
-    mut s := 0
-    mut i := 0
+    $s := 0
+    $i := 0
     while i < 500000 {
         s += <-ch
         i += 1

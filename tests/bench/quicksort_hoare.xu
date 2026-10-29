@@ -4,13 +4,13 @@ struct Sorter {
     pub a []int
 }
 
-fn (s &mut Sorter) qsort(low int, high int) {
+fn (s $&Sorter) qsort(low int, high int) {
     if low >= high {
         <<
     }
     pivot := s.a[(low + high) / 2]
-    mut i := low
-    mut j := high
+    $i := low
+    $j := high
     while i <= j {
         while s.a[i] < pivot {
             i += 1
@@ -35,20 +35,20 @@ fn (s &mut Sorter) qsort(low int, high int) {
 }
 
 fn main() int {
-    mut checksum := 0
-    mut round := 0
+    $checksum := 0
+    $round := 0
     while round < 5 {
-        mut arr := []int{}
-        mut seed := 123456789 + round * 1013904223
-        mut k := 0
+        $arr := []int{}
+        $seed := 123456789 + round * 1013904223
+        $k := 0
         while k < 100000 {
             seed = (seed * 1664525 + 1013904223) % 2147483647
             arr.push(seed)
             k += 1
         }
-        mut s := Sorter{a: arr}
+        $s := Sorter{a: arr}
         s.qsort(0, s.a.len - 1)
-        mut i := 0
+        $i := 0
         while i < s.a.len {
             checksum = (checksum * 31 + s.a[i]) % 1000000007
             i += 1

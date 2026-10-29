@@ -9,8 +9,8 @@ struct Vec3 {
 }
 
 fn fill() []Vec3 {
-    mut v := []Vec3{}
-    mut i := 0
+    $v := []Vec3{}
+    $i := 0
     while i < 256 {
         v.push(Vec3{x: f64(i & 7), y: f64((i * 3) & 7), z: f64((i * 5) & 7)})
         i += 1
@@ -20,10 +20,10 @@ fn fill() []Vec3 {
 
 fn main() int {
     v := fill()
-    mut acc := 0.0
-    mut t := 0
+    $acc := 0.0
+    $t := 0
     while t < 40000 {
-        mut i := 0
+        $i := 0
         while i < 256 {
             acc += v[i].x * v[i].x + v[i].y * v[i].y + v[i].z * v[i].z
             i += 1

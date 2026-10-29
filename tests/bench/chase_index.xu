@@ -4,8 +4,8 @@
 // Probes gather-like LoadIndex with a data-dependent subscript.
 fn fill() []int {
     n := 65536
-    mut nxt := []int{}
-    mut i := 0
+    $nxt := []int{}
+    $i := 0
     while i < n {
         nxt.push(((i * 7) + 1) & (n - 1))
         i += 1
@@ -15,8 +15,8 @@ fn fill() []int {
 
 fn main() int {
     nxt := fill()
-    mut k := 0
-    mut s := 0
+    $k := 0
+    $s := 0
     while s < 20000000 {
         k = nxt[k]
         s += 1

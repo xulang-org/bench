@@ -17,8 +17,8 @@ const buf_cap = 65536
 fn arg_n() int {
     a := args()
     if a.len > 1 {
-        mut n := 0
-        mut i := 0
+        $n := 0
+        $i := 0
         s := a[1]
         while i < s.len {
             c := s[i] & 255
@@ -47,7 +47,7 @@ struct Out {
     pub buf string
 }
 
-fn flush(o &mut Out) {
+fn flush(o $&Out) {
     if o.buf.len == 0 {
         <<
     }
@@ -57,29 +57,29 @@ fn flush(o &mut Out) {
     o.buf = ""
 }
 
-fn put_byte(o &mut Out, c int) {
-    r := mut &o.buf
+fn put_byte(o $&Out, c int) {
+    r := $&o.buf
     r.push_byte(c & 255)
     if o.buf.len >= buf_cap {
         flush(o)
     }
 }
 
-fn put_str(o &mut Out, s string) {
-    mut i := 0
+fn put_str(o $&Out, s string) {
+    $i := 0
     while i < s.len {
         put_byte(o, s[i])
         i += 1
     }
 }
 
-fn repeat_fasta(alu string, count0 int, o &mut Out) {
-    mut count := count0
-    mut pos := 0
+fn repeat_fasta(alu string, count0 int, o $&Out) {
+    $count := count0
+    $pos := 0
     alen := alu.len
     while count > 0 {
         line_n := min_i(width, count)
-        mut i := 0
+        $i := 0
         while i < line_n {
             put_byte(o, alu[pos])
             pos += 1
@@ -98,25 +98,25 @@ struct Acid {
     c int
 }
 
-fn accumulate(g &mut []Acid) {
-    mut i := 1
+fn accumulate(g $&[]Acid) {
+    $i := 1
     while i < g.len {
         g[i].p = g[i].p + g[i - 1].p
         i += 1
     }
 }
 
-fn random_fasta(g &[]Acid, count0 int, seed0 int, o &mut Out) int {
-    mut seed := seed0
-    mut count := count0
+fn random_fasta(g &[]Acid, count0 int, seed0 int, o $&Out) int {
+    $seed := seed0
+    $count := count0
     glen := g.len
     while count > 0 {
         line_n := min_i(width, count)
-        mut j := 0
+        $j := 0
         while j < line_n {
             seed = (seed * ia + ic) % im
             r := f64(seed) / f64(im)
-            mut k := 0
+            $k := 0
             while k < glen {
                 if g[k].p >= r {
                     put_byte(o, g[k].c)
@@ -136,7 +136,7 @@ fn random_fasta(g &[]Acid, count0 int, seed0 int, o &mut Out) int {
 fn main() int {
     n := arg_n()
     alu := "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
-    mut iub := []Acid{}
+    $iub := []Acid{}
     iub.push(Acid{p: 0.27, c: 97})
     iub.push(Acid{p: 0.12, c: 99})
     iub.push(Acid{p: 0.12, c: 103})
@@ -152,21 +152,21 @@ fn main() int {
     iub.push(Acid{p: 0.02, c: 86})
     iub.push(Acid{p: 0.02, c: 87})
     iub.push(Acid{p: 0.02, c: 89})
-    mut hs := []Acid{}
+    $hs := []Acid{}
     hs.push(Acid{p: 0.3029549426680, c: 97})
     hs.push(Acid{p: 0.1979883004921, c: 99})
     hs.push(Acid{p: 0.1975473066391, c: 103})
     hs.push(Acid{p: 0.3015094502008, c: 116})
-    accumulate(mut &iub)
-    accumulate(mut &hs)
-    mut seed := 42
-    mut o := Out{buf: ""}
-    put_str(mut &o, ">ONE Homo sapiens alu\n")
-    repeat_fasta(alu, 2 * n, mut &o)
-    put_str(mut &o, ">TWO IUB ambiguity codes\n")
-    seed = random_fasta(&iub, 3 * n, seed, mut &o)
-    put_str(mut &o, ">THREE Homo sapiens frequency\n")
-    seed = random_fasta(&hs, 5 * n, seed, mut &o)
-    flush(mut &o)
+    accumulate($&iub)
+    accumulate($&hs)
+    $seed := 42
+    $o := Out{buf: ""}
+    put_str($&o, ">ONE Homo sapiens alu\n")
+    repeat_fasta(alu, 2 * n, $&o)
+    put_str($&o, ">TWO IUB ambiguity codes\n")
+    seed = random_fasta(&iub, 3 * n, seed, $&o)
+    put_str($&o, ">THREE Homo sapiens frequency\n")
+    seed = random_fasta(&hs, 5 * n, seed, $&o)
+    flush($&o)
     << 0
 }

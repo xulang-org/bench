@@ -2,13 +2,13 @@
 
 // Array growth (1M pushes) + bounds-checked indexed reads.
 fn main() int {
-    mut a := []int{}
-    mut i := 0
+    $a := []int{}
+    $i := 0
     while i < 2000000 {
         a.push(i)
         i += 1
     }
-    mut s := 0
+    $s := 0
     for j in 0:a.len {
         s += a[j] & 7
     }

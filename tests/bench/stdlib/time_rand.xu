@@ -8,8 +8,8 @@ fn parse_sample(d string) int {
 
 fn main() int {
     samples := ["1ns", "1us", "5ms", "1s", "2m", "1h2m3s500ms", "-3ms"]
-    mut total := 0
-    mut i := 0
+    $total := 0
+    $i := 0
     while i < 8000 {
         d := parse_sample(samples[i % samples.len])
         t0 := time.now()
