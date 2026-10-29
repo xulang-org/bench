@@ -882,7 +882,7 @@ def main() -> int:
 
     if not args.skip_runtime:
         emit_pivot("wall median ms", wall_cell, table)
-        emit_pivot("peak RSS median MiB (wait4 ru_maxrss)", rss_cell, table)
+        emit_pivot(f"peak RSS median MiB ({peak_rss_method()})", rss_cell, table)
         emit_pivot("CPU median ms (user+sys)", cpu_cell, table)
         emit_pivot("binary bytes", bytes_cell, table)
 
