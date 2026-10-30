@@ -22,7 +22,7 @@ from pathlib import Path
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER, product_compile_argv
 LANE = "product"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_crosslang import BY_NAME, xu_src  # noqa: E402
@@ -60,7 +60,7 @@ def compile_run(
     if src_root not in cur.split(":"):
         env["XUPATH"] = src_root if not cur else f"{src_root}:{cur}"
     compiler = resolve_hosted_compiler()
-    cmd = [str(HOSTED_RUNNER), str(compiler), "build", *flags, str(src), "-o", str(out)]
+    cmd = product_compile_argv(compiler, "build", *flags, str(src), "-o", str(out), runner=HOSTED_RUNNER)
     p = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if p.returncode != 0:
         err = (p.stderr or p.stdout)[-300:].replace("\n", " ")

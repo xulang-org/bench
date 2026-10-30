@@ -8,11 +8,11 @@
 // buffer flushed with os_fd_write, matching FILE* / bufio — not one
 // giant string.
 
-const width = 60
-const im = 139968
-const ia = 3877
-const ic = 29573
-const buf_cap = 65536
+const WIDTH = 60
+const IM = 139968
+const IA = 3877
+const IC = 29573
+const BUF_CAP = 65536
 
 fn arg_n() int {
     a := args()
@@ -60,7 +60,7 @@ fn flush(o $&Out) {
 fn put_byte(o $&Out, c int) {
     r := $&o.buf
     r.push_byte(c & 255)
-    if o.buf.len >= buf_cap {
+    if o.buf.len >= BUF_CAP {
         flush(o)
     }
 }
@@ -78,7 +78,7 @@ fn repeat_fasta(alu string, count0 int, o $&Out) {
     $pos := 0
     alen := alu.len
     while count > 0 {
-        line_n := min_i(width, count)
+        line_n := min_i(WIDTH, count)
         $i := 0
         while i < line_n {
             put_byte(o, alu[pos])
@@ -111,11 +111,11 @@ fn random_fasta(g &[]Acid, count0 int, seed0 int, o $&Out) int {
     $count := count0
     glen := g.len
     while count > 0 {
-        line_n := min_i(width, count)
+        line_n := min_i(WIDTH, count)
         $j := 0
         while j < line_n {
-            seed = (seed * ia + ic) % im
-            r := f64(seed) / f64(im)
+            seed = (seed * IA + IC) % IM
+            r := f64(seed) / f64(IM)
             $k := 0
             while k < glen {
                 if g[k].p >= r {

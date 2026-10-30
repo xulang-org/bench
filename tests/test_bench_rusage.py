@@ -27,7 +27,7 @@ class LiveRssPermissionTests(unittest.TestCase):
                 self.denied_sampler():
             sample = bench_rusage.run_one(
                 [sys.executable, "-c",
-                 "import time; time.sleep(0.03); print('observed'); raise SystemExit(7)"],
+                 "import sys,time; time.sleep(0.03); sys.stdout.buffer.write(b'observed\\n'); raise SystemExit(7)"],
                 sample_interval_s=0.001, timeout_s=5,
             )
         self.assertEqual(sample.returncode, 7)
