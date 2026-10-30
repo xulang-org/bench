@@ -7,17 +7,17 @@ struct TokenResult {
 
 fn tokenize(src string) TokenResult {
     n := src.len
-    mut pos := 0
-    mut count := 0
-    mut chk := 0
+    $pos := 0
+    $count := 0
+    $chk := 0
     while pos < n {
         c := src[pos] & 255
         if c == 32 || c == 9 || c == 10 || c == 13 {
             pos += 1
             ->
         }
-        mut t_type := 0
-        mut t_len := 0
+        $t_type := 0
+        $t_len := 0
         if c == 123 {
             t_type = 1
             t_len = 1
@@ -98,14 +98,14 @@ fn tokenize(src string) TokenResult {
 
 fn main() int {
     base := "{\"project\":\"Xu\",\"version\":1.0,\"active\":true,\"count\":100,\"flag\":false,\"note\":null,\"data\":[1,2,-3,40]}"
-    mut full := ""
-    mut k := 0
+    $full := ""
+    $k := 0
     while k < 10 {
         full = full + base
         k += 1
     }
-    mut total := 0
-    mut r := 0
+    $total := 0
+    $r := 0
     while r < 1000 {
         res := tokenize(full)
         total = (total * 31 + res.chk) % 1000000007

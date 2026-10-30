@@ -9,8 +9,8 @@ struct Deque {
 }
 
 fn new_deque() Deque {
-    mut b := []int{}
-    mut i := 0
+    $b := []int{}
+    $i := 0
     while i < 16 {
         b.push(0)
         i += 1
@@ -18,17 +18,17 @@ fn new_deque() Deque {
     << Deque{buf: b, head: 0, tail: 0, count: 0, mask: 15}
 }
 
-fn (d &mut Deque) grow() {
+fn (d $&Deque) grow() {
     old_cap := d.mask + 1
     new_cap := old_cap * 2
-    mut new_buf := []int{}
-    mut i := 0
+    $new_buf := []int{}
+    $i := 0
     while i < new_cap {
         new_buf.push(0)
         i += 1
     }
     old_mask := d.mask
-    mut j := 0
+    $j := 0
     while j < d.count {
         new_buf[j] = d.buf[(d.head + j) & old_mask]
         j += 1
@@ -39,7 +39,7 @@ fn (d &mut Deque) grow() {
     d.mask = new_cap - 1
 }
 
-fn (d &mut Deque) push_back(val int) {
+fn (d $&Deque) push_back(val int) {
     if d.count == d.mask + 1 {
         d.grow()
     }
@@ -48,7 +48,7 @@ fn (d &mut Deque) push_back(val int) {
     d.count += 1
 }
 
-fn (d &mut Deque) push_front(val int) {
+fn (d $&Deque) push_front(val int) {
     if d.count == d.mask + 1 {
         d.grow()
     }
@@ -57,7 +57,7 @@ fn (d &mut Deque) push_front(val int) {
     d.count += 1
 }
 
-fn (d &mut Deque) pop_front() int {
+fn (d $&Deque) pop_front() int {
     if d.count == 0 {
         << 0
     }
@@ -67,7 +67,7 @@ fn (d &mut Deque) pop_front() int {
     << val
 }
 
-fn (d &mut Deque) pop_back() int {
+fn (d $&Deque) pop_back() int {
     if d.count == 0 {
         << 0
     }
@@ -78,10 +78,10 @@ fn (d &mut Deque) pop_back() int {
 }
 
 fn main() int {
-    mut q := new_deque()
-    mut seed := 123456789
-    mut checksum := 0
-    mut i := 0
+    $q := new_deque()
+    $seed := 123456789
+    $checksum := 0
+    $i := 0
     while i < 5000000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
         op := seed % 4

@@ -2,13 +2,13 @@
 
 // Allocation + growth: push_str to 1MB, then byte-scan.
 fn main() int {
-    mut s := ""
-    mut i := 0
+    $s := ""
+    $i := 0
     while i < 100000 {
         s.push_str("0123456789")
         i += 1
     }
-    mut c := 0
+    $c := 0
     for j in 0:s.len {
         c += s[j]
     }

@@ -26,8 +26,8 @@ fn expected_body(seq int) string {
 // so the mask keeps every step identical. Without it the product keeps
 // growing past 32 bits and wraps the i64 range instead.
 fn fnv_update(h int, body &string) int {
-    mut v := h
-    mut i := 0
+    $v := h
+    $i := 0
     while i < body.len {
         v = ((v ^ (body[i] & 255)) * 16777619) & 4294967295
         i += 1
@@ -36,7 +36,7 @@ fn fnv_update(h int, body &string) int {
 }
 
 fn find_crlf_crlf(buf string) int {
-    mut i := 0
+    $i := 0
     while i + 3 < buf.len {
         if (buf[i] & 255) == 13 && (buf[i + 1] & 255) == 10 && (buf[i + 2] & 255) == 13 && (buf[i + 3] & 255) == 10 {
             << i
@@ -51,7 +51,7 @@ fn content_length_of(head &string) int {
     idx := strings.index_of(&h, "Content-Length: ")
     if idx < 0 { << -1 }
     rest := h[(idx + 16):h.len]
-    mut end := 0
+    $end := 0
     while end < rest.len {
         c := rest[end] & 255
         if c < 48 || c > 57 { <- }
@@ -70,14 +70,14 @@ fn fetch(addr string, seq int) string {
         net.conn_close(fd) or (err) { << "" }
         << ""
     }
-    mut buf := ""
-    mut header_end := -1
-    mut content_length := -1
-    mut body := ""
-    mut done := false
+    $buf := ""
+    $header_end := -1
+    $content_length := -1
+    $body := ""
+    $done := false
     while !done {
-        mut part := ""
-        mut ok := true
+        $part := ""
+        $ok := true
         part = net.conn_read(fd, 65536) or (err) { ok = false
             << "" }
         if !ok { <- }
@@ -103,9 +103,9 @@ fn fetch(addr string, seq int) string {
 }
 
 fn worker(addr string, base int, out chan int) {
-    mut h := 2166136261
-    mut i := 0
-    mut failed := false
+    $h := 2166136261
+    $i := 0
+    $failed := false
     while i < 200 && !failed {
         seq := base + i
         body := fetch(addr + "", seq)
@@ -145,9 +145,9 @@ fn try_listen(addr string) int {
 
 fn main() int {
     // net/http has no getsockname, so pick a loopback port by rotation.
-    mut port := 19901
-    mut tries := 0
-    mut lfd := -1
+    $port := 19901
+    $tries := 0
+    $lfd := -1
     while lfd < 0 && tries < 64 {
         addr := "127.0.0.1:" + strconv.itoa(port)
         lfd = try_listen(addr + "")
@@ -161,14 +161,14 @@ fn main() int {
     addr := "127.0.0.1:" + strconv.itoa(port)
     xu serve(lfd)
     out := chan int{cap: 16}
-    mut w := 0
+    $w := 0
     while w < 16 {
         xu worker(addr + "", w * 200, out)
         w += 1
     }
-    mut sum := 0
-    mut got := 0
-    mut failed := 0
+    $sum := 0
+    $got := 0
+    $failed := 0
     while got < 16 {
         v := <-out
         if v < 0 { failed += 1 } else { sum += v }

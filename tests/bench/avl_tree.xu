@@ -11,12 +11,12 @@ struct AVL {
 }
 
 fn new_avl(cap int) AVL {
-    mut k := []int{}
-    mut v := []int{}
-    mut h := []int{}
-    mut l := []int{}
-    mut r := []int{}
-    mut i := 0
+    $k := []int{}
+    $v := []int{}
+    $h := []int{}
+    $l := []int{}
+    $r := []int{}
+    $i := 0
     while i < cap {
         k.push(0)
         v.push(0)
@@ -35,10 +35,10 @@ fn (t &AVL) get_h(idx int) int {
     << t.heights[idx]
 }
 
-fn (t &mut AVL) upd(idx int) {
+fn (t $&AVL) upd(idx int) {
     hl := t.get_h(t.lefts[idx])
     hr := t.get_h(t.rights[idx])
-    mut max_h := hr
+    $max_h := hr
     if hl > hr {
         max_h = hl
     }
@@ -49,7 +49,7 @@ fn (t &AVL) bf(idx int) int {
     << t.get_h(t.lefts[idx]) - t.get_h(t.rights[idx])
 }
 
-fn (t &mut AVL) rot_r(y int) int {
+fn (t $&AVL) rot_r(y int) int {
     x := t.lefts[y]
     t2 := t.rights[x]
     t.rights[x] = y
@@ -59,7 +59,7 @@ fn (t &mut AVL) rot_r(y int) int {
     << x
 }
 
-fn (t &mut AVL) rot_l(x int) int {
+fn (t $&AVL) rot_l(x int) int {
     y := t.rights[x]
     t2 := t.lefts[y]
     t.lefts[y] = x
@@ -69,7 +69,7 @@ fn (t &mut AVL) rot_l(x int) int {
     << y
 }
 
-fn (t &mut AVL) insert(idx int, key int, val int) int {
+fn (t $&AVL) insert(idx int, key int, val int) int {
     if idx == -1 {
         nid := t.count
         t.count += 1
@@ -108,7 +108,7 @@ fn (t &mut AVL) insert(idx int, key int, val int) int {
 }
 
 fn (t &AVL) search(key int) int {
-    mut cur := t.root
+    $cur := t.root
     while cur != -1 {
         k := t.keys[cur]
         if key == k {
@@ -123,9 +123,9 @@ fn (t &AVL) search(key int) int {
 }
 
 fn main() int {
-    mut t := new_avl(100000)
-    mut seed := 123456789
-    mut i := 0
+    $t := new_avl(100000)
+    $seed := 123456789
+    $i := 0
     while i < 80000 {
         seed = (seed * 1103515245 + 12345) & 2147483647
         k := seed % 200000
@@ -134,7 +134,7 @@ fn main() int {
         i += 1
     }
 
-    mut checksum := 0
+    $checksum := 0
     i = 0
     while i < 300000 {
         seed = (seed * 1103515245 + 12345) & 2147483647

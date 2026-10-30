@@ -6,15 +6,15 @@
 // loop transfers 16MiB in each direction. bench_crosslang runs it in a private
 // directory, so this never writes into the checkout.
 fn main() int {
-    mut s := "A"
+    $s := "A"
     for i in 0:19 {
         s = s + s
     }
     want := 524288
 
-    mut i := 0
-    mut sum := 0
-    mut got := ""
+    $i := 0
+    $sum := 0
+    $got := ""
     while i < 32 {
         wrote := write_file("roundtrip.bin", s) or (err) {
             println("write failed")

@@ -5,19 +5,19 @@
 fn main() int {
     n := 250
     nn := n * n
-    mut a := []int{}
-    mut b := []int{}
-    mut c := []int{}
-    mut t := 0
+    $a := []int{}
+    $b := []int{}
+    $c := []int{}
+    $t := 0
     while t < nn {
         a.push(0)
         b.push(0)
         c.push(0)
         t += 1
     }
-    mut i := 0
+    $i := 0
     while i < n {
-        mut j := 0
+        $j := 0
         while j < n {
             a[i * n + j] = (i * 31 + j * 7) & 1023
             b[i * n + j] = (i * 17 + j * 13) & 1023
@@ -27,10 +27,10 @@ fn main() int {
     }
     i = 0
     while i < n {
-        mut k := 0
+        $k := 0
         while k < n {
             aik := a[i * n + k]
-            mut j := 0
+            $j := 0
             while j < n {
                 c[i * n + j] += aik * b[k * n + j]
                 j += 1
@@ -39,7 +39,7 @@ fn main() int {
         }
         i += 1
     }
-    mut s := 0
+    $s := 0
     t = 0
     while t < nn {
         s += c[t]

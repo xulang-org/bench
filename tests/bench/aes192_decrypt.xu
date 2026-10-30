@@ -4,7 +4,7 @@
 fn main() int {
     key:=hex.decode_string("000102030405060708090a0b0c0d0e0f1011121314151617") or (err) {<<1}
     c:=aes.new_cipher(&key) or (err) {<<1}
-    mut block:=hex.decode_string("00112233445566778899aabbccddeeff") or (err) {<<1}
+    $block:=hex.decode_string("00112233445566778899aabbccddeeff") or (err) {<<1}
     for i in 0:100000 {block=c.decrypt(&block) or (err) {<<1}}
     println(hex.encode_to_string(block))
     <<0
