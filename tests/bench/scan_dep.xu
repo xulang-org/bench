@@ -17,12 +17,9 @@ fn main() int {
     n := a.len
     $t := 0
     while t < 20000 {
-        $prev := a[0] & 1023
         $i := 1
         while i < n {
-            v := a[i] + prev
-            a[i] = v
-            prev = v & 1023
+            a[i] = a[i] + (a[i - 1] & 1023)
             i += 1
         }
         t += 1

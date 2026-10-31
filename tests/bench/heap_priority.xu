@@ -2,70 +2,8 @@
 
 #container/heap as heap
 
-struct MinHeap {
-    pub a []int
-    pub n int
-}
-
-fn new_min_heap() MinHeap {
-    << MinHeap{a: []int{}, n: 0}
-}
-
-fn sift_down_ints(a $&[]int, root0 int, n int, x int) {
-    $root := root0
-    while true {
-        $child := root * 2 + 1
-        if child >= n { <- }
-        $value := a[child]
-        if child + 1 < n {
-            right := a[child + 1]
-            if right < value {
-                child += 1
-                value = right
-            }
-        }
-        if x <= value { <- }
-        a[root] = value
-        root = child
-    }
-    a[root] = x
-}
-
-fn min_heap_push(h $&MinHeap, x int) {
-    if h.n >= h.a.len {
-        h.a.push(0)
-    }
-    h.n = h.n + 1
-    $j := h.n - 1
-    while j > 0 {
-        i := (j - 1) >> 1
-        parent := h.a[i]
-        if x >= parent { <- }
-        h.a[j] = parent
-        j = i
-    }
-    h.a[j] = x
-}
-
-fn min_heap_pop(h $&MinHeap) int {
-    if h.n == 0 {
-        << 0
-    }
-    out := h.a[0]
-    h.n = h.n - 1
-    if h.n > 0 {
-        x := h.a[h.n]
-        n := h.n
-        sift_down_ints($&h.a, 0, n, x)
-    }
-    << out
-}
-
-fn (h $&MinHeap) push(x int) { min_heap_push(h, x) }
-fn (h $&MinHeap) pop() int { << min_heap_pop(h) }
-
 fn main() int {
-    $h := new_min_heap()
+    $h := heap.new_ints()
     $seed := 123456789
     $checksum := 0
 
@@ -73,14 +11,14 @@ fn main() int {
     $i := 0
     while i < 200000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
-        min_heap_push($&h, seed)
+        h.push(seed)
         i += 1
     }
 
     // Phase 2: Pop 100,000 elements
     i = 0
     while i < 100000 {
-        v := min_heap_pop($&h)
+        v := h.pop() or (err) { << 1 }
         checksum = (checksum * 31 + v) % 1000000007
         i += 1
     }
@@ -89,13 +27,13 @@ fn main() int {
     i = 0
     while i < 100000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
-        min_heap_push($&h, seed)
+        h.push(seed)
         i += 1
     }
 
     // Phase 4: Pop remaining 200,000 elements
     while h.n > 0 {
-        v := min_heap_pop($&h)
+        v := h.pop() or (err) { << 1 }
         checksum = (checksum * 31 + v) % 1000000007
     }
 

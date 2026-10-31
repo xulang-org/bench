@@ -39,7 +39,7 @@ fn (d $&Deque) grow() {
     d.mask = new_cap - 1
 }
 
-fn deque_push_back(d $&Deque, val int) {
+fn (d $&Deque) push_back(val int) {
     if d.count == d.mask + 1 {
         d.grow()
     }
@@ -48,7 +48,7 @@ fn deque_push_back(d $&Deque, val int) {
     d.count += 1
 }
 
-fn deque_push_front(d $&Deque, val int) {
+fn (d $&Deque) push_front(val int) {
     if d.count == d.mask + 1 {
         d.grow()
     }
@@ -57,7 +57,7 @@ fn deque_push_front(d $&Deque, val int) {
     d.count += 1
 }
 
-fn deque_pop_front(d $&Deque) int {
+fn (d $&Deque) pop_front() int {
     if d.count == 0 {
         << 0
     }
@@ -67,7 +67,7 @@ fn deque_pop_front(d $&Deque) int {
     << val
 }
 
-fn deque_pop_back(d $&Deque) int {
+fn (d $&Deque) pop_back() int {
     if d.count == 0 {
         << 0
     }
@@ -77,11 +77,6 @@ fn deque_pop_back(d $&Deque) int {
     << val
 }
 
-fn (d $&Deque) push_back(val int) { deque_push_back(d, val) }
-fn (d $&Deque) push_front(val int) { deque_push_front(d, val) }
-fn (d $&Deque) pop_front() int { << deque_pop_front(d) }
-fn (d $&Deque) pop_back() int { << deque_pop_back(d) }
-
 fn main() int {
     $q := new_deque()
     $seed := 123456789
@@ -89,26 +84,24 @@ fn main() int {
     $i := 0
     while i < 5000000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
-        op := seed & 3
+        op := seed % 4
         if op == 0 {
-            deque_push_back($&q, seed)
+            q.push_back(seed)
         } else if op == 1 {
-            deque_push_front($&q, seed)
+            q.push_front(seed)
         } else if op == 2 {
-            v := deque_pop_front($&q)
+            v := q.pop_front()
             checksum = (checksum * 33 + v) % 1000000007
         } else {
-            v := deque_pop_back($&q)
+            v := q.pop_back()
             checksum = (checksum * 33 + v) % 1000000007
         }
         i += 1
     }
-
     while q.count > 0 {
-        v := deque_pop_front($&q)
+        v := q.pop_front()
         checksum = (checksum * 33 + v) % 1000000007
     }
-
     println(checksum)
     << 0
 }

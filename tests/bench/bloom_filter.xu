@@ -19,36 +19,28 @@ fn new_bloom(num_bits int) BloomFilter {
 fn (bf $&BloomFilter) add(val int) {
     h1 := (val * 1103515245 + 12345) & 2147483647
     h2 := (val * 1664525 + 1013904223) & 2147483647
-    mask := bf.mask
-    b0 := h1 & mask
-    b1 := (h1 + h2) & mask
-    b2 := (b1 + h2) & mask
-    b3 := (b2 + h2) & mask
-    bf.bits[b0 >> 6] = bf.bits[b0 >> 6] | (1 << (b0 & 63))
-    bf.bits[b1 >> 6] = bf.bits[b1 >> 6] | (1 << (b1 & 63))
-    bf.bits[b2 >> 6] = bf.bits[b2 >> 6] | (1 << (b2 & 63))
-    bf.bits[b3 >> 6] = bf.bits[b3 >> 6] | (1 << (b3 & 63))
+    $i := 0
+    while i < 4 {
+        bit := (h1 + i * h2) & bf.mask
+        word_idx := bit >> 6
+        bit_idx := bit & 63
+        bf.bits[word_idx] = bf.bits[word_idx] | (1 << bit_idx)
+        i += 1
+    }
 }
 
 fn (bf &BloomFilter) contains(val int) bool {
-    mask := bf.mask
     h1 := (val * 1103515245 + 12345) & 2147483647
-    b0 := h1 & mask
-    if (bf.bits[b0 >> 6] & (1 << (b0 & 63))) == 0 {
-        << false
-    }
     h2 := (val * 1664525 + 1013904223) & 2147483647
-    b1 := (h1 + h2) & mask
-    if (bf.bits[b1 >> 6] & (1 << (b1 & 63))) == 0 {
-        << false
-    }
-    b2 := (b1 + h2) & mask
-    if (bf.bits[b2 >> 6] & (1 << (b2 & 63))) == 0 {
-        << false
-    }
-    b3 := (b2 + h2) & mask
-    if (bf.bits[b3 >> 6] & (1 << (b3 & 63))) == 0 {
-        << false
+    $i := 0
+    while i < 4 {
+        bit := (h1 + i * h2) & bf.mask
+        word_idx := bit >> 6
+        bit_idx := bit & 63
+        if (bf.bits[word_idx] & (1 << bit_idx)) == 0 {
+            << false
+        }
+        i += 1
     }
     << true
 }
