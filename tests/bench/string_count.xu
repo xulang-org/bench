@@ -18,8 +18,9 @@ fn main() int {
     while i < 1000000 {
         state = (state * 1103515245 + 12345) & 2147483647
         idx := (state >> 16) & 31
-        target := 97 + ((state >> 8) & 1)
-        total += count_byte(&pool[idx], target)
+        $needle := "a"
+        if ((state >> 8) & 1) == 1 { needle = "b" }
+        total += strings.count(&pool[idx], needle)
         i += 1
     }
     println(total)
