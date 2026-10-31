@@ -10,10 +10,10 @@ fn gcd(a int, b int) int {
 }
 
 fn main() int {
-    mut result := 0
-    mut i := 2000
+    $result := 0
+    $i := 2000
     while i > 0 {
-        mut j := 2000
+        $j := 2000
         while j > 0 {
             if gcd(i, j) == 1 { result += 1 }
             j -= 1

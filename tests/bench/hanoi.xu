@@ -10,7 +10,7 @@ fn moves(n int, acc int) int {
 }
 
 fn main() int {
-    mut result := moves(25, 0)
+    $result := moves(25, 0)
     println(result)
     << 0
 }

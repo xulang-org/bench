@@ -22,15 +22,15 @@ fn word(k int) string {
 }
 
 fn main() int {
-    mut counts := map[string]int{}
-    mut i := 0
+    $counts := map[string]int{}
+    $i := 0
     while i < 200000 {
         w := word(hash_at(1, i) % 8)
         count := counts.get_or(w, 0)
         counts[w] = count + 1
         i += 1
     }
-    mut result := 0
+    $result := 0
     i = 0
     while i < 8 {
         result += (i + 1) * counts.get_or(word(i), 0)

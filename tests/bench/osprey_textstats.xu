@@ -20,15 +20,15 @@ fn word(k int) string {
 }
 
 fn score(w string) int {
-    mut total := w.len
+    $total := w.len
     if strings.contains(&w, "o") { total += 7 }
     if strings.has_prefix(&w, "t") { total += 3 }
     << total
 }
 
 fn main() int {
-    mut result := 0
-    mut i := 0
+    $result := 0
+    $i := 0
     while i < 200000 {
         result += score(word(hash_at(1, i) % 8))
         i += 1

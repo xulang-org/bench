@@ -13,9 +13,9 @@ fn hash_at(seed int, i int) int {
 fn quicksort(xs &[]int) []int {
     if xs.len == 0 { << []int{} }
     pivot := xs[0]
-    mut below := []int{}
-    mut at_least := []int{}
-    mut i := 1
+    $below := []int{}
+    $at_least := []int{}
+    $i := 1
     while i < xs.len {
         if xs[i] < pivot { below.push(xs[i]) }
         i += 1
@@ -25,7 +25,7 @@ fn quicksort(xs &[]int) []int {
         if xs[i] >= pivot { at_least.push(xs[i]) }
         i += 1
     }
-    mut sorted := quicksort(&below)
+    $sorted := quicksort(&below)
     sorted.push(pivot)
     right := quicksort(&at_least)
     i = 0
@@ -35,17 +35,17 @@ fn quicksort(xs &[]int) []int {
 }
 
 fn main() int {
-    mut total := 0
-    mut t := 0
+    $total := 0
+    $t := 0
     while t < 8 {
-        mut xs := []int{}
-        mut i := 0
+        $xs := []int{}
+        $i := 0
         while i < 2000 {
             xs.push(hash_at(1 + t * 131, i) % 100000)
             i += 1
         }
         sorted := quicksort(&xs)
-        mut weight := 0
+        $weight := 0
         i = 0
         while i < sorted.len {
             weight = (weight + sorted[i] * (i + 1)) % 1000000007

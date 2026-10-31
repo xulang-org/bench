@@ -19,7 +19,7 @@ fn ways(amount int, kind int) int {
 }
 
 fn main() int {
-    mut result := ways(600, 5)
+    $result := ways(600, 5)
     println(result)
     << 0
 }
