@@ -1,0 +1,17 @@
+@main
+// Osprey (MIT): benchmarks/cases/pascal; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Unmemoised Pascal recursion: binomial coefficient C(27,13).
+
+fn binom(n int, k int) int {
+    if k == 0 { << 1 }
+    if k == n { << 1 }
+    << binom(n - 1, k - 1) + binom(n - 1, k)
+}
+
+fn main() int {
+    mut result := binom(27, 13)
+    println(result)
+    << 0
+}

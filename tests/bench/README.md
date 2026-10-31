@@ -2,6 +2,9 @@
 
 按常规语言能力面（循环、递归、字符串、数组、矩阵下标、排序、浮点、方法、并发、哈希、map、接口派发、match/switch、函数值），而不是 SPECcpu。
 
+新增 [Osprey 24 题](osprey/README.md) 保持上游原始算法、规模和确定性金标，
+与既有相似题分别注册；每题提供 Xu / Go / C / Rust / Swift 端口。
+
 以下列出部分负载；当前负载与对照语言清单以仓库根目录的 `make list` 为准。
 本页的 `make` 和 `scripts/` 命令也从仓库根目录执行，环境准备见[根 README](../../README.md)。
 
@@ -41,7 +44,7 @@
 - 优化阶段二分：`python3 scripts/opt_stage_bisect.py --bench=iface_sum --opt=2`（hosted 产品编译器的 `--dump-opt-stages` / `--opt-stop`）。
 - 跨语言：`make crosslang`（通过 hosted seed resolver 选择产品编译器，再由 hermetic wrapper 编译 Xu 负载；此入口不执行自举固定点检查）
   - 直接运行脚本时也使用同一 resolver；默认从 Xu 仓库的 `bin/xu` 或 hosted snapshot 选择，`--xu=PATH` 可指定另一个 hosted 产品编译器
-  - `--quick` 省去对照语言的调试档和编译时间；Xu 使用默认优化，Clang、rustc 的 O1/O2/O3 仍全部参与（安静机器；热机会偏慢）
+  - `--quick` 省去对照语言的调试档和编译时间；Xu 使用默认优化，Clang（主机缺失时 GCC）、rustc 的 O1/O2/O3 仍全部参与（安静机器；热机会偏慢）
   - `--benches=loop_sum,fib` 子集
   - `--benches=math_bits,algorithm_search --xu-target=macos-x64` 由产品 `xu` 交叉生成 X64，并与 `clang -arch x86_64` 在 Rosetta 下对照
   - `--discard-first` 丢掉冷缓存首跑

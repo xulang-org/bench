@@ -1,0 +1,19 @@
+@main
+// Osprey (MIT): benchmarks/cases/tak; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Takeuchi tak(32,16,8): ternary recursion with recursive arguments.
+
+fn sub(a int, b int) int { << a - b }
+fn tak(x int, y int, z int) int {
+    if x > y {
+        << tak(tak(sub(x, 1), y, z), tak(sub(y, 1), z, x), tak(sub(z, 1), x, y))
+    }
+    << z
+}
+
+fn main() int {
+    mut result := tak(32, 16, 8)
+    println(result)
+    << 0
+}
