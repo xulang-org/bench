@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import platform
 import shutil
 import stat
 import subprocess
@@ -47,12 +48,13 @@ from bench_crosslang import (  # noqa: E402
     ver_line,
     xu_src,
 )
-from bench_rusage import run_one, sparkline, write_curve_csv, write_rss_svg  # noqa: E402
+from bench_rusage import peak_rss_method, run_one, sparkline, write_curve_csv, write_rss_svg  # noqa: E402
+from bench_network import wait_for_loopback_capacity
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER, product_compile_argv
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
 PRODUCT_RUNNER = ROOT / "scripts" / "run_product_compiler.sh"
 # Keep this alias explicit: the boundary checker and product consumers use
@@ -75,6 +77,8 @@ O2_OVER_O1_FRAC = 1.05
 O2_OVER_O1_S = 0.0005
 # Same-tier timeout vs default (O1): 5× median, at least 1s.
 TIER_TIMEOUT_X = 5.0
+# A deadlocked first anchor must not hold the entire suite indefinitely.
+INITIAL_TIMEOUT_S = 60.0
 # Short-bench wall ≫ in-process CPU: leftover lifecycle wait (was ~50ms poll).
 WALL_OVER_CPU_S = 0.040
 SHORT_CPU_S = 0.040
@@ -112,6 +116,7 @@ def timed_interleaved(
     expect: bytes,
     short_iters: int = 0,
     on_rounds=None,
+    before_run=None,
 ) -> tuple[dict[tuple[str, int], RunStats], dict[tuple[str, int], str]]:
     """Measure each tier once per round, rotating and reversing run order.
 
@@ -131,9 +136,11 @@ def timed_interleaved(
 
     def take(key, interval=None):
         nonlocal o1_s
-        timeout = None
+        if before_run is not None:
+            before_run()
+        timeout = INITIAL_TIMEOUT_S
         # Keep watchdog/thread overhead identical for measured Xu tiers.
-        # Only the first unmeasured O1 anchor has no established deadline.
+        # Before the O1 anchor exists, use a bounded calibration deadline.
         if key[0] == IMPL_XU and o1_s is not None:
             timeout = max(o1_s * TIER_TIMEOUT_X, 1.0)
         s = run_one([str(bins[key])], sample_interval_s=interval,
@@ -142,7 +149,8 @@ def timed_interleaved(
             if timeout is not None and s.wall_s >= timeout:
                 errors[key] = f"TIMEOUT: {s.wall_s:.1f}s >= {timeout:.1f}s"
             else:
-                errors[key] = "run failed: " + s.stderr.decode("utf-8", "replace")[-400:]
+                diagnostic = (s.stderr or s.stdout).decode("utf-8", "replace")[-400:]
+                errors[key] = f"run failed (exit {s.returncode}): " + diagnostic
             return None
         if key not in mismatches:
             outputs[key] = s.stdout
@@ -230,8 +238,8 @@ def xu_compile_argv(compiler: Path, src: Path, opt: int, out: Path,
                     extra: list[str] | None = None, *, lane: str = LANE) -> list[str]:
     if lane != "product":
         raise ValueError(f"unsupported compiler lane: {lane}")
-    return [str(PRODUCT_COMPILER_RUNNER), str(compiler), "build", str(src),
-            f"-O{opt}", *(extra or []), "-o", str(out)]
+    return product_compile_argv(compiler, "build", str(src), f"-O{opt}",
+                                *(extra or []), "-o", str(out), runner=PRODUCT_COMPILER_RUNNER)
 
 
 def clang_compile_argv(clang: str, src: Path, opt: int, out: Path) -> list[str]:
@@ -337,6 +345,12 @@ def timed_compile(
         rss.append(s.max_rss_mib)
         cpus.append(s.cpu_s)
     out.chmod(out.stat().st_mode | stat.S_IEXEC)
+    # GetProcessTimes/PeakWorkingSetSize describe Bash itself on Windows,
+    # not the compiler child launched by the hermetic product wrapper.
+    # Keep end-to-end wall time; unavailable compiler metrics are not zero.
+    if sys.platform == "win32" and len(cmd) > 1 and Path(cmd[1]) == PRODUCT_COMPILER_RUNNER:
+        rss = [float("nan")]
+        cpus = [float("nan")]
     return None, RunStats(
         best_s=min(walls),
         med_s=median(walls),
@@ -516,7 +530,7 @@ def main() -> int:
         print(s, flush=True)
         lines.append(s)
 
-    host = subprocess.run(["uname", "-sm"], capture_output=True, text=True).stdout.strip()
+    host = f"{platform.platform()} {platform.machine()}"
     kind = "product"
     disc = "yes" if args.discard_first else "no"
     sample_s = None if args.sample_ms <= 0 else args.sample_ms / 1000.0
@@ -568,6 +582,8 @@ def main() -> int:
             f"# compile: best+median of {args.compile_iters} discard-first={disc}; "
             "compiler peak RSS + CPU (wait4 parent; rustc/swiftc children may be undercounted)"
         )
+        if sys.platform == "win32":
+            log("# Xu compile CPU/RSS: nan = unavailable through the Bash wrapper; wall includes wrapper overhead")
     if args.skip_runtime:
         log("# runtime: skipped")
     if sample_s is None:
@@ -576,7 +592,7 @@ def main() -> int:
         log(f"# curves: live RSS every {args.sample_ms:g}ms → {curves_dir}")
     log(
         "# method: plb2-style whole-program wall; AOT; same-algorithm ports; "
-        "RSS peak=wait4 ru_maxrss; curve=live poll"
+        f"RSS peak={peak_rss_method()}; curve=live poll"
     )
     log(f"# benches: {', '.join(b.name for b in selected)}")
     log(
@@ -692,7 +708,8 @@ def main() -> int:
                 log(f"  skip {impl} {bench.name}: no {src}")
                 return
             for opt in opts:
-                out = tmp / f"{impl}_{bench.name}.O{opt}"
+                suffix = ".exe" if sys.platform == "win32" else ""
+                out = tmp / f"{impl}_{bench.name}.O{opt}{suffix}"
                 do_compile(impl, bench.name, opt, argv_fn(tool, src, opt, out), out)
 
         try_lang(IMPL_CLANG, "c", "c", clang_bin, clang_compile_argv, OPTS)
@@ -720,6 +737,7 @@ def main() -> int:
             sample_interval_s=sample_s, cwd=run_dirs[bench.name], expect=expect,
             short_iters=21 if gate else 0,
             on_rounds=lambda count: log(f"# {bench.name}: {count} measured rounds per tier"),
+            before_run=(lambda: wait_for_loopback_capacity(bench.loopback_connections)) if bench.loopback_connections else None,
         )
         for (impl, opt), error in errors.items():
             log(f"  run FAIL {impl} {opt_label(opt)} {bench.name}: {error}")
@@ -864,7 +882,7 @@ def main() -> int:
 
     if not args.skip_runtime:
         emit_pivot("wall median ms", wall_cell, table)
-        emit_pivot("peak RSS median MiB (wait4 ru_maxrss)", rss_cell, table)
+        emit_pivot(f"peak RSS median MiB ({peak_rss_method()})", rss_cell, table)
         emit_pivot("CPU median ms (user+sys)", cpu_cell, table)
         emit_pivot("binary bytes", bytes_cell, table)
 

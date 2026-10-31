@@ -6,13 +6,13 @@ struct Acc {
     n int
 }
 
-fn (a &mut Acc) add(x int) {
+fn (a $&Acc) add(x int) {
     a.n += x
 }
 
 fn main() int {
-    mut a := Acc{n: 0}
-    mut i := 0
+    $a := Acc{n: 0}
+    $i := 0
     while i < 8000000 {
         a.add(i & 7)
         i += 1

@@ -11,8 +11,8 @@
 fn arg_n() int {
     a := args()
     if a.len > 1 {
-        mut n := 0
-        mut i := 0
+        $n := 0
+        $i := 0
         s := a[1]
         while i < s.len {
             c := s[i] & 255
@@ -30,18 +30,18 @@ fn arg_n() int {
     << 4000
 }
 
-fn render(pixels &mut []u8, w int) {
-    mut y := 0
+fn render(pixels $&[]u8, w int) {
+    $y := 0
     while y < w {
         ci := 2.0 * f64(y) / f64(w) - 1.0
-        mut x := 0
+        $x := 0
         while x < w {
             cr := 2.0 * f64(x) / f64(w) - 1.5
-            mut zr := 0.0
-            mut zi := 0.0
-            mut tr := 0.0
-            mut ti := 0.0
-            mut iter := 0
+            $zr := 0.0
+            $zi := 0.0
+            $tr := 0.0
+            $ti := 0.0
+            $iter := 0
             while iter < 50 && tr + ti <= 4.0 {
                 zi = 2.0 * zr * zi + ci
                 zr = tr - ti + cr
@@ -62,11 +62,11 @@ fn render(pixels &mut []u8, w int) {
 
 fn write_pixels(pixels &[]u8) {
     n := pixels.len
-    mut off := 0
-    mut chunk := ""
+    $off := 0
+    $chunk := ""
     while off < n {
         chunk = ""
-        mut end := off + 65536
+        $end := off + 65536
         if end > n {
             end = n
         }
@@ -84,11 +84,11 @@ fn main() int {
     size := arg_n()
     w := (size + 7) / 8 * 8
     nbytes := w * w / 8
-    mut pixels := []u8{}
+    $pixels := []u8{}
     for i in 0:nbytes {
         pixels.push(u8(0))
     }
-    render(mut &pixels, w)
+    render($&pixels, w)
     header := "P4\n" + str(w) + " " + str(w) + "\n"
     os_fd_write(1, header) or (err) { << 1 }
     write_pixels(&pixels)

@@ -15,17 +15,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts import bench_game
 
 
+def executable_python(directory: Path, name: str, source: str) -> Path:
+    program = directory / (name + ".py")
+    program.write_text("#!/usr/bin/env python3\n" + source, encoding="utf-8")
+    os.chmod(program, 0o755)
+    if sys.platform == "win32":
+        launcher = directory / (name + ".cmd")
+        launcher.write_text(f'@"{sys.executable}" "%~dp0{name}.py" %*\n', encoding="utf-8")
+        return launcher
+    return program
+
+
 class FullOutputGateTests(unittest.TestCase):
     def test_stdout_fingerprint_streams_binary_output(self) -> None:
         payload = bytes(range(256)) * 8193
         with tempfile.TemporaryDirectory() as td:
-            program = Path(td) / "emit.py"
-            program.write_text(
-                "#!/usr/bin/env python3\n"
+            program = executable_python(Path(td), "emit",
                 "import sys\n"
                 "sys.stdout.buffer.write(bytes(range(256)) * int(sys.argv[1]))\n"
             )
-            os.chmod(program, 0o755)
 
             got = bench_game.stdout_fingerprint(program, 8193)
 
@@ -34,14 +42,11 @@ class FullOutputGateTests(unittest.TestCase):
 
     def test_stdout_fingerprint_preserves_run_failure_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as td:
-            program = Path(td) / "fail.py"
-            program.write_text(
-                "#!/usr/bin/env python3\n"
+            program = executable_python(Path(td), "fail",
                 "import sys\n"
                 "sys.stderr.write('diagnostic-tail')\n"
                 "raise SystemExit(7)\n"
             )
-            os.chmod(program, 0o755)
 
             with self.assertRaisesRegex(RuntimeError, "diagnostic-tail"):
                 bench_game.stdout_fingerprint(program, 1)

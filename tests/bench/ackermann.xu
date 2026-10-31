@@ -13,7 +13,7 @@ fn ack(m int, n int) int {
 }
 
 fn main() int {
-    mut result := ack(3, 10)
+    $result := ack(3, 10)
     println(result)
     << 0
 }

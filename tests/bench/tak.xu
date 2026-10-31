@@ -6,14 +6,14 @@
 
 fn sub(a int, b int) int { << a - b }
 fn tak(x int, y int, z int) int {
-    if x > y {
+    if x - y > 0 {
         << tak(tak(sub(x, 1), y, z), tak(sub(y, 1), z, x), tak(sub(z, 1), x, y))
     }
     << z
 }
 
 fn main() int {
-    mut result := tak(32, 16, 8)
+    $result := tak(32, 16, 8)
     println(result)
     << 0
 }

@@ -13,7 +13,7 @@ struct Forest {
     used int
 }
 
-fn alloc(t &mut Forest, l int, r int) int {
+fn alloc(t $&Forest, l int, r int) int {
     id := t.used
     if id >= t.left.len {
         t.left.push(l)
@@ -26,7 +26,7 @@ fn alloc(t &mut Forest, l int, r int) int {
     << id
 }
 
-fn make(t &mut Forest, depth int) int {
+fn make(t $&Forest, depth int) int {
     if depth <= 0 {
         << alloc(t, -1, -1)
     }
@@ -48,8 +48,8 @@ fn parse_n() int {
     if av.len <= 1 {
         << 18
     }
-    mut v := 0
-    mut i := 0
+    $v := 0
+    $i := 0
     s := av[1]
     while i < s.len {
         c := s[i] & 255
@@ -69,31 +69,31 @@ fn parse_n() int {
 }
 
 fn main() int {
-    mut v := parse_n()
+    $v := parse_n()
     min_depth := 4
     if v < min_depth + 2 {
         v = min_depth + 2
     }
     md := v
-    mut scratch := Forest{left: []int{}, right: []int{}, used: 0}
-    mut long_f := Forest{left: []int{}, right: []int{}, used: 0}
-    sid := make(mut &scratch, md + 1)
+    $scratch := Forest{left: []int{}, right: []int{}, used: 0}
+    $long_f := Forest{left: []int{}, right: []int{}, used: 0}
+    sid := make($&scratch, md + 1)
     println("stretch tree of depth " + str(md + 1) + "\t check: " + str(count(&scratch, sid)))
     scratch.used = 0
-    lid := make(mut &long_f, md)
-    mut depth := min_depth
+    lid := make($&long_f, md)
+    $depth := min_depth
     while depth <= md {
-        mut iterations := 1
-        mut s := 0
+        $iterations := 1
+        $s := 0
         while s < md - depth + min_depth {
             iterations = iterations * 2
             s += 1
         }
-        mut check := 0
-        mut i := 0
+        $check := 0
+        $i := 0
         while i < iterations {
             scratch.used = 0
-            tid := make(mut &scratch, depth)
+            tid := make($&scratch, depth)
             check += count(&scratch, tid)
             i += 1
         }

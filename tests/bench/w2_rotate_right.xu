@@ -4,9 +4,9 @@
 
 // W2 diagnostic: variable right rotation with loop-carried state.
 fn main() int {
-    mut x := 0x123456789abcdef0
-    mut checksum := 0
-    mut i := 0
+    $x := 0x123456789abcdef0
+    $checksum := 0
+    $i := 0
     while i < 10000000 {
         x = bits.rotate_right(x ^ i, i & 63)
         checksum = checksum ^ x

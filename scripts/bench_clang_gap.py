@@ -21,6 +21,7 @@ from pathlib import Path
 from bench_clang_gap_manifest import MANIFEST, ROOT, load_manifest
 from bench_crosslang import resolve_product_compiler
 from bench_rusage import run_one
+from product_compiler import product_compile_argv
 
 XU_ROOT = Path(os.environ.get("XU_ROOT", ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(XU_ROOT / "scripts"))
@@ -134,7 +135,7 @@ def main() -> int:
                 binary = out / 'artifacts' / f'{safe}-{label}{suffix}'
                 source = ROOT / (entry['c_source'] if label == 'clang-O3' else entry['xu_source'])
                 argv = ([args.clang, '-O3', str(source), '-o', str(binary), '-lm'] if label == 'clang-O3'
-                        else [str(PRODUCT_RUNNER), str(compilers[label]), 'build', str(source), '-O3', '-o', str(binary)])
+                        else product_compile_argv(compilers[label], 'build', str(source), '-O3', '-o', str(binary), runner=PRODUCT_RUNNER))
                 compiled = cmd(argv)
                 if compiled.returncode != 0 or not binary.is_file():
                     raise RuntimeError(f'{name}/{label}: compile failed: {compiled.stderr.decode(errors="replace")[-2000:]}')

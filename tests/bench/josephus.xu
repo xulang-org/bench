@@ -5,8 +5,8 @@
 // Josephus survivor, zero-based, n=10000000 and k=7; variable divisor chain.
 
 fn main() int {
-    mut result := 0
-    mut i := 2
+    $result := 0
+    $i := 2
     while i <= 10000000 {
         result = (result + 7) % i
         i += 1

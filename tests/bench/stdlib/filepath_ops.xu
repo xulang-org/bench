@@ -5,8 +5,8 @@
 fn main() int {
     samples := ["/tmp/a/./b/../c", "/tmp/../tmp/dir/file.txt", "./alpha//beta/../gamma", "foo/bar/../baz/./qux", "C:\\Users\\xu\\..\\Temp\\", "a/b/c/../../d", "relative/path/segment.txt", "/", "a/b/../../../../c", "x/y/z", "x//y//./z//../a", "/tmp////multi////slash//path/"]
 
-    mut total := 0
-    mut i := 0
+    $total := 0
+    $i := 0
     while i < 180000 {
         p := samples[i % samples.len]
         c := fp.clean(&p)

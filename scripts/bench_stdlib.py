@@ -36,7 +36,7 @@ from bench_crosslang import timed_runs  # noqa: E402
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("XU_ROOT", BENCH_ROOT.parent / "xu")).expanduser().resolve()
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, PRODUCT_RUNNER as HOSTED_RUNNER, product_compile_argv
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
 PRODUCT_RUNNER = ROOT / "scripts" / "run_product_compiler.sh"
 # Canonical boundary names shared by product consumers.
@@ -84,7 +84,7 @@ def compile_src(
 ) -> tuple[float, str]:
     if lane != "product":
         raise ValueError(f"unsupported compiler lane: {lane}")
-    cmd = [str(PRODUCT_RUNNER), str(compiler), "build", str(src), "-o", str(out)]
+    cmd = product_compile_argv(compiler, "build", str(src), "-o", str(out), runner=PRODUCT_RUNNER)
 
     t0 = _time.perf_counter()
     p = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)

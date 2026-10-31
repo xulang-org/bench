@@ -5,8 +5,8 @@
 // Repeated stdlib lower-bound search.  Keep the query loop in a scalar helper
 // so the benchmark measures the algorithm rather than array construction.
 fn search_sum(a &[]int) int {
-    mut total := 0
-    mut q := 0
+    $total := 0
+    $q := 0
     while q < 4000000 {
         v := ((q * 1103515245 + 12345) & 0x3FFFF) * 3
         total += sort.search_ints(a, v)
@@ -16,8 +16,8 @@ fn search_sum(a &[]int) int {
 }
 
 fn main() int {
-    mut a := []int{}
-    mut i := 0
+    $a := []int{}
+    $i := 0
     while i < 131072 {
         a.push(i * 3)
         i += 1

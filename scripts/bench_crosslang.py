@@ -18,7 +18,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import io
 import os
 import shutil
 import subprocess
@@ -29,10 +28,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if sys.platform == "win32":
-    if hasattr(sys.stdout, "buffer"):
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    if hasattr(sys.stderr, "buffer"):
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    # Rewrapping an existing buffer gives two streams ownership of the same
+    # descriptor and closes pytest's capture buffer when either is collected.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_rusage import (  # noqa: E402
@@ -42,6 +42,7 @@ from bench_rusage import (  # noqa: E402
     write_curve_csv,
     write_rss_svg,
 )
+from bench_network import wait_for_loopback_capacity
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 xu_env = os.environ.get("XU_ROOT")
@@ -54,7 +55,7 @@ else:
 os.environ["XU_ROOT"] = str(ROOT)
 
 sys.path.insert(0, str(ROOT / "scripts"))
-from product_compiler import resolve_product_compiler as resolve_hosted_compiler
+from product_compiler import resolve_product_compiler as resolve_hosted_compiler, product_compile_argv
 CROSS = BENCH_ROOT / "tests" / "bench" / "cross"
 PRODUCT_XU = ROOT / "bin" / "xu"
 HOST_SEED_RESOLVER = ROOT / "scripts" / "xu_host_seed.sh"
@@ -141,6 +142,7 @@ class Bench:
     face: str
     langs: tuple[str, ...]
     xu_opt_matrix: bool = False
+    loopback_connections: int = 0
 
 
 CORE = ("go", "c", "rs", "swift")
@@ -185,6 +187,7 @@ BENCHES: list[Bench] = [
         "3200\n35945209188\n",
         "HTTP 高并发吞吐(自环回,16 并发 x 200 请求)",
         ("go", "rs"),
+        loopback_connections=3200,
     ),
     Bench("map_ops", "20000100000\n", "哈希表插入/查找", CORE),
     Bench("iface_sum", "20000000\n", "接口动态派发", CORE),
@@ -268,6 +271,7 @@ def timed_runs(
     sample_interval_s: float | None = None,
     timeout_s: float | None = None,
     cwd: Path | None = None,
+    before_run=None,
 ) -> RunStats:
     """Wall best/median + median peak RSS + median CPU.
 
@@ -280,6 +284,8 @@ def timed_runs(
     out = ""
     total = n + (1 if discard_first else 0)
     for i in range(total):
+        if before_run is not None:
+            before_run()
         s = run_one(
             [path], sample_interval_s=None, timeout_s=timeout_s, cwd=cwd, verify_rss_output=True
         )
@@ -297,6 +303,8 @@ def timed_runs(
         out = text
     curve: tuple[tuple[float, float], ...] = ()
     if sample_interval_s is not None and sample_interval_s > 0:
+        if before_run is not None:
+            before_run()
         cs = run_one(
             [path],
             sample_interval_s=sample_interval_s,
@@ -568,26 +576,9 @@ def main():
         jobs.append((name, bench, cmd, out_bin))
 
     def xu_compile_argv(src: Path, flags: list[str], out: Path) -> list[str]:
-        if sys.platform == "win32" or not PRODUCT_RUNNER.is_file():
-            return [
-                str(xu_compiler),
-                "build",
-                str(src),
-                *xu_target_flags,
-                *flags,
-                "-o",
-                str(out),
-            ]
-        return [
-            str(PRODUCT_RUNNER),
-            str(xu_compiler),
-            "build",
-            str(src),
-            *xu_target_flags,
-            *flags,
-            "-o",
-            str(out),
-        ]
+        return product_compile_argv(xu_compiler, "build", str(src),
+                                    *xu_target_flags, *flags, "-o", str(out),
+                                    runner=PRODUCT_RUNNER)
 
     def add_xu(bench: Bench, flags: list[str], label: str, tag: str):
         out = tmp / f"xu_{bench.name}_{tag}{ext}"
@@ -703,6 +694,7 @@ def main():
                 sample_interval_s=sample_s,
                 timeout_s=timeout,
                 cwd=run_dirs[bench],
+                before_run=(lambda: wait_for_loopback_capacity(BY_NAME[bench].loopback_connections)) if BY_NAME[bench].loopback_connections else None,
             )
         except SystemExit as e:
             log(

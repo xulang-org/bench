@@ -11,8 +11,8 @@ struct MinHeap {
 }
 
 fn new_min_heap() MinHeap {
-    mut it := []HeapItem{}
-    mut i := 0
+    $it := []HeapItem{}
+    $i := 0
     while i < 256 {
         it.push(HeapItem{freq: 0, nid: 0})
         i += 1
@@ -27,8 +27,8 @@ fn heap_less(a &HeapItem, b &HeapItem) bool {
     << a.nid < b.nid
 }
 
-fn (h &mut MinHeap) push(freq int, nid int) {
-    mut i := h.size
+fn (h $&MinHeap) push(freq int, nid int) {
+    $i := h.size
     h.size += 1
     item := HeapItem{freq: freq, nid: nid}
     while i > 0 {
@@ -43,18 +43,18 @@ fn (h &mut MinHeap) push(freq int, nid int) {
     h.items[i] = item
 }
 
-fn (h &mut MinHeap) pop() HeapItem {
+fn (h $&MinHeap) pop() HeapItem {
     top := h.items[0]
     h.size -= 1
     last := h.items[h.size]
     if h.size == 0 {
         << top
     }
-    mut i := 0
+    $i := 0
     while i * 2 + 1 < h.size {
         left := i * 2 + 1
         right := left + 1
-        mut best := left
+        $best := left
         if right < h.size && heap_less(&h.items[right], &h.items[left]) {
             best = right
         }
@@ -78,7 +78,7 @@ struct HuffmanContext {
     pub code_lens []int
 }
 
-fn (ctx &mut HuffmanContext) get_codes(nid int, curr_code int, curr_len int) {
+fn (ctx $&HuffmanContext) get_codes(nid int, curr_code int, curr_len int) {
     if ctx.nodes_left[nid] == -1 && ctx.nodes_right[nid] == -1 {
         ch := ctx.nodes_ch[nid]
         ctx.codes[ch] = curr_code
@@ -93,8 +93,8 @@ fn isqrt(n int) int {
     if n <= 0 {
         << 0
     }
-    mut x := n
-    mut y := (x + 1) / 2
+    $x := n
+    $y := (x + 1) / 2
     while y < x {
         x = y
         y = (x + n / x) / 2
@@ -103,15 +103,15 @@ fn isqrt(n int) int {
 }
 
 fn main() int {
-    mut raw := []int{}
-    mut freqs := []int{}
-    mut i := 0
+    $raw := []int{}
+    $freqs := []int{}
+    $i := 0
     while i < 64 {
         freqs.push(0)
         i += 1
     }
 
-    mut seed := 123456789
+    $seed := 123456789
     i = 0
     while i < 20000 {
         seed = (seed * 1103515245 + 12345) & 2147483647
@@ -121,12 +121,12 @@ fn main() int {
         i += 1
     }
 
-    mut nf := []int{}
-    mut nc := []int{}
-    mut nl := []int{}
-    mut nr := []int{}
-    mut cd := []int{}
-    mut cl := []int{}
+    $nf := []int{}
+    $nc := []int{}
+    $nl := []int{}
+    $nr := []int{}
+    $cd := []int{}
+    $cl := []int{}
     i = 0
     while i < 256 {
         nf.push(0)
@@ -142,7 +142,7 @@ fn main() int {
         i += 1
     }
 
-    mut ctx := HuffmanContext{
+    $ctx := HuffmanContext{
         nodes_freq: nf,
         nodes_ch: nc,
         nodes_left: nl,
@@ -151,10 +151,10 @@ fn main() int {
         code_lens: cl
     }
 
-    mut node_count := 0
-    mut heap := new_min_heap()
+    $node_count := 0
+    $heap := new_min_heap()
 
-    mut ch := 0
+    $ch := 0
     while ch < 64 {
         if freqs[ch] > 0 {
             nid := node_count
@@ -184,17 +184,17 @@ fn main() int {
     ctx.get_codes(root, 0, 0)
 
     // encode
-    mut bit_buf := []int{}
-    mut bit_count := 0
-    mut curr_word := 0
-    mut curr_bits := 0
+    $bit_buf := []int{}
+    $bit_count := 0
+    $curr_word := 0
+    $curr_bits := 0
 
     i = 0
     while i < 20000 {
         b := raw[i]
         c := ctx.codes[b]
         l := ctx.code_lens[b]
-        mut bit_idx := l - 1
+        $bit_idx := l - 1
         while bit_idx >= 0 {
             bit := (c >> bit_idx) & 1
             curr_word = (curr_word << 1) | bit
@@ -214,12 +214,12 @@ fn main() int {
         bit_buf.push(curr_word)
     }
 
-    mut total_checksum := 0
-    mut round := 0
+    $total_checksum := 0
+    $round := 0
     while round < 50 {
-        mut cur_node := root
-        mut decoded_sum := 0
-        mut bit_i := 0
+        $cur_node := root
+        $decoded_sum := 0
+        $bit_i := 0
         while bit_i < bit_count {
             word_idx := bit_i / 32
             bit_pos := 31 - (bit_i % 32)

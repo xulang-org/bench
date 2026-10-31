@@ -26,6 +26,19 @@ def git_bash() -> Path:
     raise SystemExit("Git for Windows Bash is required for the hosted seed resolver")
 
 
+def product_compile_argv(compiler: Path, *arguments: str,
+                         runner: Path = PRODUCT_RUNNER) -> list[str]:
+    """Keep the hermetic product wrapper on native Windows as well as Unix.
+
+    Pass paths and arguments directly, without shell interpolation. Native
+    Python cannot execute a shebang script through CreateProcess on Windows.
+    """
+    command = [runner.as_posix(), str(compiler), *map(str, arguments)]
+    if sys.platform == "win32":
+        command.insert(0, str(git_bash()))
+    return command
+
+
 def resolve_product_compiler(explicit: str | Path | None = None) -> Path:
     env = os.environ.copy()
     if explicit is not None:

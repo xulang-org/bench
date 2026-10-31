@@ -4,8 +4,8 @@
 #path/filepath as fp
 
 fn checksum(s string) int {
-    mut sum := 0
-    mut i := 0
+    $sum := 0
+    $i := 0
     while i < s.len {
         sum += s[i]
         i += 1
@@ -16,19 +16,19 @@ fn checksum(s string) int {
 fn main() int {
     dir := os.mkdir_temp("", "xu-stdlib-rw-") or (err) {
         println("m")
-        << 0
+        << 1
     }
     dir_copy := dir + ""
-    mut path_parts := []string{}
+    $path_parts := []string{}
     path_parts.push(dir_copy)
     path_parts.push("payload.bin")
     file := fp.join(path_parts)
     file2 := file + ".fd"
     file2_create := file2 + ""
 
-    mut payload := "abcdefghijklmnopqrstuvwxyz0123456789abcdef"
-    mut i := 0
-    mut total := 0
+    $payload := "abcdefghijklmnopqrstuvwxyz0123456789abcdef"
+    $i := 0
+    $total := 0
     while i < 32 {
         os.write(file, payload) or (err) {
             println("w")
@@ -55,7 +55,7 @@ fn main() int {
         i += 1
     }
 
-    mut f := os.create(file2_create) or (err) {
+    $f := os.create(file2_create) or (err) {
         println("c")
         << 1
     }
@@ -63,7 +63,7 @@ fn main() int {
     while i < 128 {
         n := f.write(payload) or (err) {
             println("f")
-            << 0
+            << 1
         }
         total += n
         i += 1

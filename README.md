@@ -27,6 +27,27 @@ python3 scripts/bench_clang_gap_manifest.py
 make test
 ```
 
+Windows 原生 Python 的性能入口会通过 Git for Windows Bash 调用相同的隔离编译包装器，
+保留参数边界和编译器退出状态。请安装 Git for Windows，并确保 Bash 中的 `python3`
+指向可用的 Python 3 解释器。可从 PowerShell 直接运行：
+
+```powershell
+$env:XU_ROOT = (Resolve-Path ../xu).Path
+python scripts/bench_opt_levels.py --xu ../xu/bin/xu.exe --quick --check
+python scripts/bench_stdlib.py --xu ../xu/bin/xu.exe --iters=7 --discard-first
+python -m pytest tests scripts/test_bench_game.py
+```
+
+Windows 的 Xu 编译 wall time 包含隔离包装器开销。优化档报告中的编译 CPU/RSS
+显示为 `nan`（不可用）：Windows 进程计数只覆盖 Bash 本身，不能将其冒充编译器子进程。
+已生成的 Xu 程序仍直接执行，运行 CPU/RSS 按目标进程采集。
+RSS 表头标明实际采样协议；`--timings` 分相表使用本轮毫秒测量值，
+不预设优化开销来自某个编译阶段。
+优化档采样在建立 O1 基线前使用 60 秒超时，随后沿用相对 O1 的期限；首轮预热死锁
+会保留为失败样本，并继续检查其他配置。
+标准库文件 I/O 负载在临时目录创建或文件写入失败时返回非零状态，避免将错误标记
+误存为成功的性能样本。
+
 更多负载说明见 [套件索引](tests/bench/README.md)。
 [Osprey 24 题](tests/bench/osprey/README.md) 保持上游原始工作量与 MIT 来源，
 各题提供 Xu / Go / C / Rust / Swift 端口；C 主机横测在缺少 Clang 时使用 GCC。
@@ -35,6 +56,10 @@ make test
 每次请求建立新 TCP 连接，校验响应正文和固定校验和；Xu、Go、Rust 提供对照实现。
 Go 使用 `net/http`，Rust 使用标准库线程与最小 HTTP 服务，结果包含连接、调度和协议开销。
 该负载尚未进入官网统一多平台测量，不能混入已有正式数据的性能比值。
+Windows 的临时 TCP 端口会被 `TIME_WAIT` 保留。每次启动该负载前，工具读取实际 IPv4
+动态端口范围与 TCP 表，等待足够容纳 3200 次新连接及 1024 个余量；各语言使用同一准入
+策略。等待最多 300 秒并单独记录，不计入目标 wall/CPU/RSS，也不修改系统设置。完整
+矩阵因此可能包含数分钟的冷却；连接负载与性能阈值保持原值。
 
 `reports/`、曲线和运行产物仅本机保留，不提交。原语言仓库的 `docs/`
 评测记录留在原处；需要旧基线时显式传入其路径。
