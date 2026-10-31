@@ -13,7 +13,7 @@ fn fib(n int) int {
 }
 
 fn main() int {
-    mut result := fib(35)
+    $result := fib(35)
     println(result)
     << 0
 }

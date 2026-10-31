@@ -11,9 +11,9 @@ fn hash_at(seed int, i int) int {
 }
 
 fn merge(left &[]int, right &[]int) []int {
-    mut result := []int{}
-    mut i := 0
-    mut j := 0
+    $result := []int{}
+    $i := 0
+    $j := 0
     while i < left.len && j < right.len {
         if right[j] < left[i] {
             result.push(right[j])
@@ -32,15 +32,15 @@ fn merge(left &[]int, right &[]int) []int {
 
 fn merge_sort(xs &[]int) []int {
     if xs.len < 2 {
-        mut result := []int{}
-        mut i := 0
+        $result := []int{}
+        $i := 0
         while i < xs.len { result.push(xs[i])
             i += 1 }
         << result
     }
-    mut evens := []int{}
-    mut odds := []int{}
-    mut i := 0
+    $evens := []int{}
+    $odds := []int{}
+    $i := 0
     while i < xs.len { evens.push(xs[i])
         i += 2 }
     i = 1
@@ -52,17 +52,17 @@ fn merge_sort(xs &[]int) []int {
 }
 
 fn main() int {
-    mut total := 0
-    mut t := 0
+    $total := 0
+    $t := 0
     while t < 8 {
-        mut xs := []int{}
-        mut i := 0
+        $xs := []int{}
+        $i := 0
         while i < 2000 {
             xs.push(hash_at(1 + t * 131, i) % 100000)
             i += 1
         }
         sorted := merge_sort(&xs)
-        mut weight := 0
+        $weight := 0
         i = 0
         while i < sorted.len {
             weight = (weight + sorted[i] * (i + 1)) % 1000000007

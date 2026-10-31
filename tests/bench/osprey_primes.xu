@@ -15,8 +15,8 @@ fn is_prime(n int) int {
 }
 
 fn main() int {
-    mut result := 0
-    mut n := 2
+    $result := 0
+    $n := 2
     while n < 200000 {
         if is_prime(n) != 0 { result += 1 }
         n += 1

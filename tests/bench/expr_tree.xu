@@ -27,8 +27,8 @@ fn build(seed int, idx int, depth int) Expr {
 
 fn main() int {
     seed := 1
-    mut total := 0
-    mut t := 0
+    $total := 0
+    $t := 0
     while t < 10 {
         expr := build(seed + t * 7, 1, 14)
         total = (total + expr.eval()) % 1000000007

@@ -13,17 +13,17 @@ fn sum_list(xs &[]int, i int) int {
 
 fn below_list(xs &[]int, i int) int {
     if i == xs.len { << 0 }
-    mut add := 0
+    $add := 0
     if xs[i] < 500 { add = 1 }
     << add + below_list(xs, i + 1)
 }
 
 fn main() int {
-    mut total := 0
-    mut t := 0
+    $total := 0
+    $t := 0
     while t < 8 {
-        mut xs := []int{}
-        mut i := 0
+        $xs := []int{}
+        $i := 0
         while i < 4000 {
             xs.push(hash_at(1 + t * 131, i) % 1000)
             i += 1
