@@ -28,6 +28,8 @@ make test
 ```
 
 更多负载说明见 [套件索引](tests/bench/README.md)。
+[Osprey 24 题](tests/bench/osprey/README.md) 保持上游原始工作量与 MIT 来源，
+各题提供 Xu / Go / C / Rust / Swift 端口；C 主机横测在缺少 Clang 时使用 GCC。
 
 `http_concurrent` 使用 16 个 worker，各执行 200 次自环回 HTTP 请求。
 每次请求建立新 TCP 连接，校验响应正文和固定校验和；Xu、Go、Rust 提供对照实现。

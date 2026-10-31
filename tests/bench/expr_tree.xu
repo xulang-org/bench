@@ -1,0 +1,39 @@
+@main
+// Osprey (MIT): benchmarks/cases/exprtree; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+fn r1(x int) int { << (x * 16807) % 2147483647 }
+fn hash_at(seed int, i int) int { << r1(r1(seed + i)) }
+
+struct@ Expr {
+    fn eval() int
+}
+
+struct Lit { value int }
+struct Add { left Expr, right Expr }
+struct Mul { left Expr, right Expr }
+
+fn (lit Lit) eval() int { << lit.value }
+fn (add Add) eval() int { << (add.left.eval() + add.right.eval()) % 1000000007 }
+fn (mul Mul) eval() int { << (mul.left.eval() * mul.right.eval()) % 1000000007 }
+
+fn build(seed int, idx int, depth int) Expr {
+    if depth == 0 { << Lit{value: hash_at(seed, idx) % 1000} }
+    left := build(seed, idx * 2 + 1, depth - 1)
+    right := build(seed, idx * 2 + 2, depth - 1)
+    if hash_at(seed, idx) % 2 == 0 { << Add{left: left, right: right} }
+    << Mul{left: left, right: right}
+}
+
+fn main() int {
+    seed := 1
+    mut total := 0
+    mut t := 0
+    while t < 10 {
+        expr := build(seed + t * 7, 1, 14)
+        total = (total + expr.eval()) % 1000000007
+        t += 1
+    }
+    println(total)
+    << 0
+}

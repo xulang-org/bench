@@ -1,0 +1,152 @@
+{
+  "upstream": "https://github.com/Nimblesite/osprey",
+  "revision": "aeca2191136a2c1d64349b792118bc45e2557bfe",
+  "license": "MIT",
+  "seed": 1,
+  "cases": [
+    {
+      "case": "ackermann",
+      "bench": "ackermann",
+      "golden": "golden/ackermann.txt",
+      "workload": "Ackermann-Peter function ack(3,10) \u2014 deep non-tail recursion"
+    },
+    {
+      "case": "binarytrees",
+      "bench": "osprey_binarytrees",
+      "golden": "golden/binarytrees.txt",
+      "workload": "1200 owning binary trees of depth 13; build then check (16383 nodes each)"
+    },
+    {
+      "case": "coins",
+      "bench": "coins",
+      "golden": "golden/coins.txt",
+      "workload": "Count ways to make 600 from coins [1,5,10,25,50] \u2014 combinatorial recursion (SICP)"
+    },
+    {
+      "case": "collatz",
+      "bench": "collatz",
+      "golden": "golden/collatz.txt",
+      "workload": "Sum of Collatz (3n+1) stopping times over 1..100000 \u2014 integer division n/2 in deep recursion"
+    },
+    {
+      "case": "coprime",
+      "bench": "osprey_coprime",
+      "golden": "golden/coprime.txt",
+      "workload": "Count coprime pairs in a 2000x2000 grid \u2014 nested iteration + Euclidean gcd"
+    },
+    {
+      "case": "digitsum",
+      "bench": "digitsum",
+      "golden": "golden/digitsum.txt",
+      "workload": "Sum of decimal digit-sums over 1..2000000 \u2014 integer division n/10 and modulo"
+    },
+    {
+      "case": "exprtree",
+      "bench": "expr_tree",
+      "golden": "golden/exprtree.txt",
+      "workload": "10 owning expression trees of depth 14; build then modular-evaluate"
+    },
+    {
+      "case": "factorial",
+      "bench": "factorial_mod",
+      "golden": "golden/factorial.txt",
+      "workload": "Product 1..10,000,000 mod 1000000007 \u2014 multiplication-heavy fold"
+    },
+    {
+      "case": "fib",
+      "bench": "osprey_fib",
+      "golden": "golden/fib.txt",
+      "workload": "Naive recursive Fibonacci, fib(35) \u2014 function-call & recursion overhead"
+    },
+    {
+      "case": "gcdsum",
+      "bench": "gcd_sum",
+      "golden": "golden/gcdsum.txt",
+      "workload": "Sum of gcd(i,1234567) for i in 1..1999999 \u2014 Euclidean recursion, modulo heavy"
+    },
+    {
+      "case": "hanoi",
+      "bench": "hanoi",
+      "golden": "golden/hanoi.txt",
+      "workload": "Towers of Hanoi move count (n=25) \u2014 exponential double recursion"
+    },
+    {
+      "case": "isqrt",
+      "bench": "isqrt",
+      "golden": "golden/isqrt.txt",
+      "workload": "Sum of integer square roots over 1..1000000 \u2014 Newton's method, integer division heavy"
+    },
+    {
+      "case": "josephus",
+      "bench": "josephus",
+      "golden": "golden/josephus.txt",
+      "workload": "Josephus survivor index (n=10,000,000, k=7) \u2014 modular iteration"
+    },
+    {
+      "case": "listops",
+      "bench": "osprey_listops",
+      "golden": "golden/listops.txt",
+      "workload": "8 growable vectors x 4000 integers; recursive sum and count-below traversals"
+    },
+    {
+      "case": "mergesort",
+      "bench": "merge_sort",
+      "golden": "golden/mergesort.txt",
+      "workload": "8 x 2000 values; alternating split, recursive merge sort with fresh vectors; rank checksum"
+    },
+    {
+      "case": "mutual",
+      "bench": "mutual_recursion",
+      "golden": "golden/mutual.txt",
+      "workload": "Mutually recursive parity of i%1000, 1 <= i < 130000"
+    },
+    {
+      "case": "nestedloop",
+      "bench": "osprey_nestedloop",
+      "golden": "golden/nestedloop.txt",
+      "workload": "Triple-nested loop 250^3 accumulating (i*j*k) mod 1000000007 \u2014 nested iteration"
+    },
+    {
+      "case": "pascal",
+      "bench": "pascal",
+      "golden": "golden/pascal.txt",
+      "workload": "Binomial C(27,13) via naive un-memoised Pascal recursion \u2014 exponential recursion"
+    },
+    {
+      "case": "powmod",
+      "bench": "powmod",
+      "golden": "golden/powmod.txt",
+      "workload": "Sum i^20 mod 1000000007, 1 <= i < 1000000; twenty modular multiplies"
+    },
+    {
+      "case": "primes",
+      "bench": "osprey_primes",
+      "golden": "golden/primes.txt",
+      "workload": "Count primes below 200000 by trial division \u2014 integer modulo in a hot loop"
+    },
+    {
+      "case": "quicksort",
+      "bench": "osprey_quicksort",
+      "golden": "golden/quicksort.txt",
+      "workload": "8 x 2000 values; first-element pivot, two partition passes, fresh vectors; rank checksum"
+    },
+    {
+      "case": "tak",
+      "bench": "tak",
+      "golden": "golden/tak.txt",
+      "workload": "Takeuchi function tak(32,16,8) \u2014 heavy ternary self-recursion"
+    },
+    {
+      "case": "textstats",
+      "bench": "osprey_textstats",
+      "golden": "golden/textstats.txt",
+      "workload": "200000 tokens, 8 words; length + contains(o) + startsWith(t)"
+    },
+    {
+      "case": "wordfreq",
+      "bench": "word_frequency",
+      "golden": "golden/wordfreq.txt",
+      "workload": "200000 tokens, 8 words; string-keyed frequency map, weighted counts"
+    }
+  ]
+}

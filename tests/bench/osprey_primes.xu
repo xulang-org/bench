@@ -1,0 +1,26 @@
+@main
+// Osprey (MIT): benchmarks/cases/primes; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Osprey primes: trial division, every candidate divisor from 2 through sqrt(n).
+
+fn has_factor(n int, d int) int {
+    if d * d > n { << 0 }
+    if n % d == 0 { << 1 }
+    << has_factor(n, d + 1)
+}
+fn is_prime(n int) int {
+    if n < 2 { << 0 }
+    << 1 - has_factor(n, 2)
+}
+
+fn main() int {
+    mut result := 0
+    mut n := 2
+    while n < 200000 {
+        if is_prime(n) != 0 { result += 1 }
+        n += 1
+    }
+    println(result)
+    << 0
+}

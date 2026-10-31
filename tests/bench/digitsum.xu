@@ -1,0 +1,21 @@
+@main
+// Osprey (MIT): benchmarks/cases/digitsum; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Recursive decimal digit sums, summed over 1..2000000.
+
+fn digit_sum(n int) int {
+    if n < 10 { << n }
+    << n % 10 + digit_sum(n / 10)
+}
+
+fn main() int {
+    mut result := 0
+    mut i := 1
+    while i <= 2000000 {
+        result += digit_sum(i)
+        i += 1
+    }
+    println(result)
+    << 0
+}

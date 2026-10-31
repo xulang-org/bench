@@ -1,0 +1,16 @@
+@main
+// Osprey (MIT): benchmarks/cases/josephus; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Josephus survivor, zero-based, n=10000000 and k=7; variable divisor chain.
+
+fn main() int {
+    mut result := 0
+    mut i := 2
+    while i <= 10000000 {
+        result = (result + 7) % i
+        i += 1
+    }
+    println(result)
+    << 0
+}

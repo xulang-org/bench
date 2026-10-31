@@ -1,0 +1,27 @@
+@main
+// Osprey (MIT): benchmarks/cases/isqrt; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Integer Newton iteration, sum floor(sqrt(i)) over 1..1000000.
+
+fn root(n int) int {
+    if n < 2 { << n }
+    mut x := n
+    mut y := (x + n / x) / 2
+    while y < x {
+        x = y
+        y = (x + n / x) / 2
+    }
+    << x
+}
+
+fn main() int {
+    mut result := 0
+    mut i := 1
+    while i <= 1000000 {
+        result += root(i)
+        i += 1
+    }
+    println(result)
+    << 0
+}

@@ -1,0 +1,76 @@
+@main
+// Osprey (MIT): benchmarks/cases/mergesort; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Top-down merge sort with alternating split and fresh growable vectors.
+// 8 rounds x 2000 values; seed=1+131*t, rank-weighted modular checksum.
+// Identical split/merge/push loops in all ports; see tests/bench/osprey/README.md.
+
+fn hash_at(seed int, i int) int {
+    << (((seed + i) * 16807) % 2147483647 * 16807) % 2147483647
+}
+
+fn merge(left &[]int, right &[]int) []int {
+    mut result := []int{}
+    mut i := 0
+    mut j := 0
+    while i < left.len && j < right.len {
+        if right[j] < left[i] {
+            result.push(right[j])
+            j += 1
+        } else {
+            result.push(left[i])
+            i += 1
+        }
+    }
+    while i < left.len { result.push(left[i])
+        i += 1 }
+    while j < right.len { result.push(right[j])
+        j += 1 }
+    << result
+}
+
+fn merge_sort(xs &[]int) []int {
+    if xs.len < 2 {
+        mut result := []int{}
+        mut i := 0
+        while i < xs.len { result.push(xs[i])
+            i += 1 }
+        << result
+    }
+    mut evens := []int{}
+    mut odds := []int{}
+    mut i := 0
+    while i < xs.len { evens.push(xs[i])
+        i += 2 }
+    i = 1
+    while i < xs.len { odds.push(xs[i])
+        i += 2 }
+    left := merge_sort(&evens)
+    right := merge_sort(&odds)
+    << merge(&left, &right)
+}
+
+fn main() int {
+    mut total := 0
+    mut t := 0
+    while t < 8 {
+        mut xs := []int{}
+        mut i := 0
+        while i < 2000 {
+            xs.push(hash_at(1 + t * 131, i) % 100000)
+            i += 1
+        }
+        sorted := merge_sort(&xs)
+        mut weight := 0
+        i = 0
+        while i < sorted.len {
+            weight = (weight + sorted[i] * (i + 1)) % 1000000007
+            i += 1
+        }
+        total = (total + weight) % 1000000007
+        t += 1
+    }
+    println(total)
+    << 0
+}

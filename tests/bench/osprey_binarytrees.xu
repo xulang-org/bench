@@ -1,0 +1,33 @@
+@main
+// Osprey (MIT): benchmarks/cases/binarytrees; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+struct@ Tree {
+    fn check() int
+}
+
+struct Leaf {}
+struct Node {
+    left Tree
+    right Tree
+}
+
+fn (leaf Leaf) check() int { << 0 }
+fn (node Node) check() int { << 1 + node.left.check() + node.right.check() }
+
+fn make(depth int) Tree {
+    if depth == 0 { << Node{left: Leaf{}, right: Leaf{}} }
+    << Node{left: make(depth - 1), right: make(depth - 1)}
+}
+
+fn main() int {
+    mut acc := 0
+    mut i := 0
+    while i < 1200 {
+        tree := make(13)
+        acc = acc + tree.check()
+        i += 1
+    }
+    println(acc)
+    << 0
+}

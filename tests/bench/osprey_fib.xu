@@ -1,0 +1,19 @@
+@main
+// Osprey (MIT): benchmarks/cases/fib; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Osprey fib: naive fib(35), including the original two base cases.
+
+fn add(a int, b int) int { << a + b }
+fn sub(a int, b int) int { << a - b }
+fn fib(n int) int {
+    if n == 0 { << 0 }
+    if n == 1 { << 1 }
+    << add(fib(sub(n, 1)), fib(sub(n, 2)))
+}
+
+fn main() int {
+    mut result := fib(35)
+    println(result)
+    << 0
+}
