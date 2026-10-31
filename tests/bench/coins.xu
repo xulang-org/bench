@@ -1,0 +1,25 @@
+@main
+// Osprey (MIT): benchmarks/cases/coins; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Unmemoised SICP change counting: amount 600, denominations 1/5/10/25/50.
+
+fn coin(k int) int {
+    if k == 1 { << 1 }
+    if k == 2 { << 5 }
+    if k == 3 { << 10 }
+    if k == 4 { << 25 }
+    << 50
+}
+fn ways(amount int, kind int) int {
+    if amount == 0 { << 1 }
+    if amount < 0 { << 0 }
+    if kind == 0 { << 0 }
+    << ways(amount - coin(kind), kind) + ways(amount, kind - 1)
+}
+
+fn main() int {
+    mut result := ways(600, 5)
+    println(result)
+    << 0
+}

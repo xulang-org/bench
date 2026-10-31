@@ -87,6 +87,22 @@ RUST_LEVELS = (
 XU_BASE = "Xu"
 
 
+def c_profiles(compiler: str) -> tuple:
+    """Keep C optimization levels comparable without relabelling GCC as Clang."""
+    return tuple((level, f"{compiler} -O{level}", list(flags), tag)
+                 for level, _label, flags, tag in C_LEVELS)
+
+
+def select_c_compiler(explicit: str | None, target: str | None) -> str:
+    # Apple cross-target flags require Clang; host builds may use GCC.
+    name = explicit or ("clang" if target or which("clang") else "gcc")
+    if target and name != "clang":
+        raise SystemExit("--xu-target requires --cc=clang")
+    if explicit and not which(name):
+        raise SystemExit(f"requested C compiler unavailable: {name}")
+    return name
+
+
 def median(xs: list[float]) -> float:
     s = sorted(xs)
     n = len(s)
@@ -201,6 +217,31 @@ BENCHES: list[Bench] = [
     Bench('aes256_encrypt', '05e02782a54c19f76b3397c6e5855a6c\n', 'AES软件 256 encrypt', CORE, xu_opt_matrix=True),
     Bench('aes256_decrypt', '4b1a2e40a8a6ad8761b3a6fca8719ee5\n', 'AES软件 256 decrypt', CORE, xu_opt_matrix=True),
     Bench('aes256_key_setup', '1033425\n', 'AES软件 256 key_setup', CORE, xu_opt_matrix=True),
+    # Osprey original algorithms/workloads (MIT); tests/bench/osprey/README.md.
+    Bench('ackermann', '8189\n', 'Osprey: Ackermann-Peter function ack(3,10) — deep non-tail recursion', CORE),
+    Bench('osprey_binarytrees', '19659600\n', 'Osprey: 1200 owning binary trees of depth 13; build then check (16383 nodes each)', CORE),
+    Bench('coins', '116727\n', 'Osprey: Count ways to make 600 from coins [1,5,10,25,50] — combinatorial recursion (SICP)', CORE),
+    Bench('collatz', '10753840\n', 'Osprey: Sum of Collatz (3n+1) stopping times over 1..100000 — integer division n/2 in deep recursion', CORE),
+    Bench('osprey_coprime', '2433175\n', 'Osprey: Count coprime pairs in a 2000x2000 grid — nested iteration + Euclidean gcd', CORE),
+    Bench('digitsum', '55000002\n', 'Osprey: Sum of decimal digit-sums over 1..2000000 — integer division n/10 and modulo', CORE),
+    Bench('expr_tree', '900720437\n', 'Osprey: 10 owning expression trees of depth 14; build then modular-evaluate', CORE),
+    Bench('factorial_mod', '682498929\n', 'Osprey: Product 1..10,000,000 mod 1000000007 — multiplication-heavy fold', CORE),
+    Bench('osprey_fib', '9227465\n', 'Osprey: Naive recursive Fibonacci, fib(35) — function-call & recursion overhead', CORE),
+    Bench('gcd_sum', '7201567\n', 'Osprey: Sum of gcd(i,1234567) for i in 1..1999999 — Euclidean recursion, modulo heavy', CORE),
+    Bench('hanoi', '33554431\n', 'Osprey: Towers of Hanoi move count (n=25) — exponential double recursion', CORE),
+    Bench('isqrt', '666167500\n', "Osprey: Sum of integer square roots over 1..1000000 — Newton's method, integer division heavy", CORE),
+    Bench('josephus', '1400177\n', 'Osprey: Josephus survivor index (n=10,000,000, k=7) — modular iteration', CORE),
+    Bench('osprey_listops', '15992435\n', 'Osprey: 8 growable vectors x 4000 integers; recursive sum and count-below traversals', CORE),
+    Bench('merge_sort', '563434287\n', 'Osprey: 8 x 2000 values; alternating split, recursive merge sort with fresh vectors; rank checksum', CORE),
+    Bench('mutual_recursion', '64999\n', 'Osprey: Mutually recursive parity of i%1000, 1 <= i < 130000', CORE),
+    Bench('osprey_nestedloop', '255643180\n', 'Osprey: Triple-nested loop 250^3 accumulating (i*j*k) mod 1000000007 — nested iteration', CORE),
+    Bench('pascal', '20058300\n', 'Osprey: Binomial C(27,13) via naive un-memoised Pascal recursion — exponential recursion', CORE),
+    Bench('powmod', '980475159\n', 'Osprey: Sum i^20 mod 1000000007, 1 <= i < 1000000; twenty modular multiplies', CORE),
+    Bench('osprey_primes', '17984\n', 'Osprey: Count primes below 200000 by trial division — integer modulo in a hot loop', CORE),
+    Bench('osprey_quicksort', '563434287\n', 'Osprey: 8 x 2000 values; first-element pivot, two partition passes, fresh vectors; rank checksum', CORE),
+    Bench('tak', '9\n', 'Osprey: Takeuchi function tak(32,16,8) — heavy ternary self-recursion', CORE),
+    Bench('osprey_textstats', '1574956\n', 'Osprey: 200000 tokens, 8 words; length + contains(o) + startsWith(t)', CORE),
+    Bench('word_frequency', '900036\n', 'Osprey: 200000 tokens, 8 words; string-keyed frequency map, weighted counts', CORE),
 ]
 
 BY_NAME = {b.name: b for b in BENCHES}
@@ -362,6 +403,8 @@ def main():
         choices=("macos-arm64", "macos-x64"),
         help="benchmark a macOS target emitted by product Xu (x64 uses Rosetta)",
     )
+    ap.add_argument("--cc", choices=("clang", "gcc"),
+                    help="C compiler (default: clang, falling back to gcc on the host)")
     ap.add_argument("--skip-compile-times", action="store_true")
     ap.add_argument(
         "--benches",
@@ -498,16 +541,20 @@ def main():
     log(f"# benches: {', '.join(b.name for b in selected)}")
     if cross_arch:
         log("# cross-arch peers: clang only (Go/Rust/Swift host binaries omitted)")
+    # Cross-target Apple flags require Clang. GCC fallback is host-only and
+    # must retain its own identity in every timing/size/compile row.
+    c_name = select_c_compiler(args.cc, args.xu_target)
+    c_levels = c_profiles(c_name)
     tools = {
         "go": which("go"),
-        "clang": which("clang"),
+        "cc": which(c_name),
         "rustc": which("rustc"),
         "swiftc": which("swiftc"),
     }
     if tools["go"]:
         log(f"# go: {ver_line(['go', 'version'])}")
-    if tools["clang"]:
-        log(f"# clang: {ver_line(['clang', '--version'])}")
+    if tools["cc"]:
+        log(f"# {c_name}: {ver_line([c_name, '--version'])}")
     if tools["rustc"]:
         log(f"# rustc: {ver_line(['rustc', '--version'])}")
     if tools["swiftc"]:
@@ -560,22 +607,22 @@ def main():
                 ["go", "build", "-o", str(out), *peer_sources(bench.name, "go")],
                 out,
             )
-        if "c" in langs and tools["clang"]:
+        if "c" in langs and tools["cc"]:
             src = cross_src(bench.name, "c")
             if args.full or (want_debug_peers and bench.xu_opt_matrix):
                 out0 = tmp / f"c_{bench.name}_o0{ext}"
                 add(
-                    "clang -O0",
+                    f"{c_name} -O0",
                     bench.name,
-                    ["clang", *clang_arch_flags, "-O0", "-o", str(out0), str(src)],
+                    [c_name, *clang_arch_flags, "-O0", "-o", str(out0), str(src)],
                     out0,
                 )
-            for _level, label, flags, tag in C_LEVELS:
+            for _level, label, flags, tag in c_levels:
                 out = tmp / f"c_{bench.name}_{tag}{ext}"
                 add(
                     label,
                     bench.name,
-                    ["clang", *clang_arch_flags, *flags, "-o", str(out), str(src)],
+                    [c_name, *clang_arch_flags, *flags, "-o", str(out), str(src)],
                     out,
                 )
         if "rs" in langs and tools["rustc"] and not cross_arch:
@@ -733,14 +780,14 @@ def main():
                         ],
                     )
                 )
-            if "c" in bench.langs and tools["clang"]:
-                for _level, label, flags, tag in C_LEVELS:
+            if "c" in bench.langs and tools["cc"]:
+                for _level, label, flags, tag in c_levels:
                     compile_jobs.append(
                         (
                             label,
                             bench.name,
                             [
-                                "clang",
+                                c_name,
                                 *clang_arch_flags,
                                 *flags,
                                 "-o",
@@ -790,9 +837,7 @@ def main():
     SIZE_PEERS = (
         "Xu",
         "go build",
-        "clang -O1",
-        "clang -O2",
-        "clang -O3",
+        *(label for _level, label, _flags, _tag in c_levels),
         "rustc -O1",
         "rustc -O2",
         "rustc -O3",

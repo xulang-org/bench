@@ -1,0 +1,41 @@
+@main
+// Osprey (MIT): benchmarks/cases/wordfreq; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// String-keyed frequency map, 200000 tokens, deterministic seed=1.
+// Every token performs a map lookup followed by an update (not an indexed counter).
+// Eight immutable ASCII keys; weighted final counts; see tests/bench/osprey/README.md.
+
+fn hash_at(seed int, i int) int {
+    << (((seed + i) * 16807) % 2147483647 * 16807) % 2147483647
+}
+
+fn word(k int) string {
+    if k == 0 { << "the" }
+    if k == 1 { << "quick" }
+    if k == 2 { << "brown" }
+    if k == 3 { << "fox" }
+    if k == 4 { << "jumps" }
+    if k == 5 { << "over" }
+    if k == 6 { << "lazy" }
+    << "dog"
+}
+
+fn main() int {
+    mut counts := map[string]int{}
+    mut i := 0
+    while i < 200000 {
+        w := word(hash_at(1, i) % 8)
+        count := counts.get_or(w, 0)
+        counts[w] = count + 1
+        i += 1
+    }
+    mut result := 0
+    i = 0
+    while i < 8 {
+        result += (i + 1) * counts.get_or(word(i), 0)
+        i += 1
+    }
+    println(result)
+    << 0
+}

@@ -1,0 +1,19 @@
+@main
+// Osprey (MIT): benchmarks/cases/ackermann; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Ackermann(3,10): nested, data-dependent recursion.
+
+fn add(a int, b int) int { << a + b }
+fn sub(a int, b int) int { << a - b }
+fn ack(m int, n int) int {
+    if m == 0 { << add(n, 1) }
+    if n == 0 { << ack(sub(m, 1), 1) }
+    << ack(sub(m, 1), ack(m, sub(n, 1)))
+}
+
+fn main() int {
+    mut result := ack(3, 10)
+    println(result)
+    << 0
+}

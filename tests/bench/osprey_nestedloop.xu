@@ -1,0 +1,39 @@
+@main
+// Osprey (MIT): benchmarks/cases/nestedloop; deterministic original workload.
+// https://github.com/Nimblesite/osprey ; see tests/bench/osprey/README.md.
+
+// Osprey nestedloop: descending 250^3 modular multiply/adds.
+
+fn loop_k(i int, j int, n int, initial int) int {
+    mut k := n
+    mut acc := initial
+    while k != 0 {
+        acc = (acc + i * j * k) % 1000000007
+        k -= 1
+    }
+    << acc
+}
+fn loop_j(i int, n int, initial int) int {
+    mut j := n
+    mut acc := initial
+    while j != 0 {
+        acc = loop_k(i, j, n, acc)
+        j -= 1
+    }
+    << acc
+}
+fn loop_i(n int) int {
+    mut i := n
+    mut acc := 0
+    while i != 0 {
+        acc = loop_j(i, n, acc)
+        i -= 1
+    }
+    << acc
+}
+
+fn main() int {
+    mut result := loop_i(250)
+    println(result)
+    << 0
+}
