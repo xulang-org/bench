@@ -39,7 +39,7 @@ fn (d $&Deque) grow() {
     d.mask = new_cap - 1
 }
 
-fn (d $&Deque) push_back(val int) {
+fn deque_push_back(d $&Deque, val int) {
     if d.count == d.mask + 1 {
         d.grow()
     }
@@ -48,7 +48,7 @@ fn (d $&Deque) push_back(val int) {
     d.count += 1
 }
 
-fn (d $&Deque) push_front(val int) {
+fn deque_push_front(d $&Deque, val int) {
     if d.count == d.mask + 1 {
         d.grow()
     }
@@ -57,7 +57,7 @@ fn (d $&Deque) push_front(val int) {
     d.count += 1
 }
 
-fn (d $&Deque) pop_front() int {
+fn deque_pop_front(d $&Deque) int {
     if d.count == 0 {
         << 0
     }
@@ -67,7 +67,7 @@ fn (d $&Deque) pop_front() int {
     << val
 }
 
-fn (d $&Deque) pop_back() int {
+fn deque_pop_back(d $&Deque) int {
     if d.count == 0 {
         << 0
     }
@@ -77,6 +77,11 @@ fn (d $&Deque) pop_back() int {
     << val
 }
 
+fn (d $&Deque) push_back(val int) { deque_push_back(d, val) }
+fn (d $&Deque) push_front(val int) { deque_push_front(d, val) }
+fn (d $&Deque) pop_front() int { << deque_pop_front(d) }
+fn (d $&Deque) pop_back() int { << deque_pop_back(d) }
+
 fn main() int {
     $q := new_deque()
     $seed := 123456789
@@ -84,24 +89,26 @@ fn main() int {
     $i := 0
     while i < 5000000 {
         seed = (seed * 1664525 + 1013904223) % 2147483647
-        op := seed % 4
+        op := seed & 3
         if op == 0 {
-            q.push_back(seed)
+            deque_push_back($&q, seed)
         } else if op == 1 {
-            q.push_front(seed)
+            deque_push_front($&q, seed)
         } else if op == 2 {
-            v := q.pop_front()
+            v := deque_pop_front($&q)
             checksum = (checksum * 33 + v) % 1000000007
         } else {
-            v := q.pop_back()
+            v := deque_pop_back($&q)
             checksum = (checksum * 33 + v) % 1000000007
         }
         i += 1
     }
+
     while q.count > 0 {
-        v := q.pop_front()
+        v := deque_pop_front($&q)
         checksum = (checksum * 33 + v) % 1000000007
     }
+
     println(checksum)
     << 0
 }
