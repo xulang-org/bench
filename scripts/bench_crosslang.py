@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -512,6 +513,9 @@ def main():
         print(s, flush=True)
         lines.append(s)
 
+    def record(impl, bench, status, **values):
+        log('# result: ' + json.dumps(dict(impl=impl, bench=bench, status=status, **values)))
+
     host = f"{platform.system()} {platform.machine()}"
     log(f"# host: {host}")
     log(f"# date: {time.strftime('%Y-%m-%d %H:%M')}")
@@ -675,8 +679,9 @@ def main():
                 f"{name:<22} {bench:<14} {'FAIL':>8} {'':>8} "
                 f"{'':>8} {'':>8} {'':>10}  compile"
             )
-            err = (p.stderr or p.stdout)[-400:]
+            err = (p.stderr or p.stdout)[-400:] or f'compiler exit status {p.returncode}'
             log(err)
+            record(name, bench, 'compile_failed', error=err)
             continue
         os.chmod(out_bin, 0o755)
         sz = out_bin.stat().st_size
@@ -696,12 +701,13 @@ def main():
                 cwd=run_dirs[bench],
                 before_run=(lambda: wait_for_loopback_capacity(BY_NAME[bench].loopback_connections)) if BY_NAME[bench].loopback_connections else None,
             )
-        except SystemExit as e:
+        except (SystemExit, RuntimeError) as e:
             log(
                 f"{name:<22} {bench:<14} {'FAIL':>8} {'':>8} "
                 f"{'':>8} {'':>8} {sz:10d}  {e}"
             )
             fail_mismatch = True
+            record(name, bench, 'measurement_failed' if isinstance(e, RuntimeError) else 'run_failed', error=str(e))
             continue
         if name == XU_BASE:
             xu_base_s[bench] = st.med_s
@@ -714,6 +720,11 @@ def main():
         best_ms = st.best_s * 1000
         med_ms = st.med_s * 1000
         cpu_ms = st.med_cpu_s * 1000
+        if ok == 'OK':
+            record(name, bench, 'ok', wall_ms=med_ms, best_ms=best_ms,
+                   rss_mib=st.med_rss_mib, cpu_ms=cpu_ms, bytes=sz)
+        else:
+            record(name, bench, 'stdout_mismatch', error=ok)
         spark = sparkline(st.rss_curve) if st.rss_curve else ""
         extra = f"  {spark}" if spark else ""
         log(

@@ -46,13 +46,20 @@ def _linux_peak_rss(cmd, cwd, timeout_s, stdout, stderr, returncode, verify_outp
     helper, _directory = _linux_rss_helper()
     with tempfile.TemporaryDirectory(prefix="xu-bench-rss-run-") as directory:
         report = Path(directory) / "rss.txt"
-        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-            measured = subprocess.run([str(helper), str(report), *cmd], stdout=out, stderr=err,
-                                      cwd=cwd, timeout=timeout_s + 1 if timeout_s else None)
-            out.seek(0)
-            err.seek(0)
-            measured_out, measured_err = out.read(), err.read()
-        if measured.returncode or not report.is_file():
+        for attempt in range(3):
+            report.unlink(missing_ok=True)
+            with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+                measured = subprocess.run([str(helper), str(report), *cmd], stdout=out, stderr=err,
+                                          cwd=cwd, timeout=timeout_s + 1 if timeout_s else None)
+                out.seek(0)
+                err.seek(0)
+                measured_out, measured_err = out.read(), err.read()
+            if not measured.returncode and report.is_file():
+                break
+            # A threaded process can disappear between its exit stop and CONT.
+            # Retry the entire untimed sample; never substitute launcher RSS.
+            if b'PTRACE_CONT: No such process' in measured_err and attempt < 2:
+                continue
             raise RuntimeError("Linux RSS measurement failed: " + measured_err.decode("utf-8", "replace")[-1000:])
         peak, measured_rc = map(int, report.read_text().split())
         if measured_rc != returncode or (verify_output and (measured_out, measured_err) != (stdout, stderr)):
