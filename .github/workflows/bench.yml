@@ -27,6 +27,16 @@ on:
         description: 'Published SDK seed tag; empty selects the latest published SDK'
         required: false
         default: ''
+      macos_arm64_image:
+        description: 'Official ARM64 runner image (xcode-27 is a preview fallback)'
+        required: true
+        default: 'macos-latest'
+        type: choice
+        options:
+          - macos-latest
+          - macos-15
+          - macos-26
+          - xcode-27
 
 permissions:
   contents: read
@@ -85,7 +95,7 @@ jobs:
             archive_type: tar
 
           - name: macOS ARM64 (Apple Silicon)
-            os: macos-latest
+            os: ${{ github.event.inputs.macos_arm64_image || 'macos-latest' }}
             platform_id: macos-arm64
             target: macos-arm64
             os_name: macOS
@@ -167,7 +177,14 @@ jobs:
           if [[ "$XU_BENCH_TARGET" == windows-* ]]; then EXE=xu.exe; fi
           mkdir -p reports ../bench-compiler
           cd ../xu
-          python3 scripts/restore_product_seed.py --target "$XU_BENCH_TARGET" --destination "bin/$EXE"
+          for ATTEMPT in 1 2 3; do
+            if python3 scripts/restore_product_seed.py --target "$XU_BENCH_TARGET" --destination "bin/$EXE"; then
+              break
+            fi
+            if [ "$ATTEMPT" = 3 ]; then exit 1; fi
+            echo "Verified SDK seed download failed; retrying after a transient network error"
+            sleep 10
+          done
           XU_SKIP_CROSS=1 scripts/build_hosted_chain.sh --candidate-only "bin/$EXE" "../bench-compiler/$EXE"
           python3 scripts/check_release_identity.py --xu "../bench-compiler/$EXE" --require-cli
           python3 scripts/check_bootstrap_xu_boundary.py --ci --strict-freeze --json > ../bench-compiler/source-boundary.json
