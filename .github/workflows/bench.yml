@@ -220,6 +220,8 @@ jobs:
           PY
 
       - name: Run cross-language benchmarks
+        id: measure
+        continue-on-error: true
         run: |
           mkdir -p reports
           INPUT_MODE="${{ github.event.inputs.mode }}"
@@ -262,9 +264,16 @@ jobs:
             bench/reports/github_summary.md
             bench/reports/compiler-identity.json
 
+      - name: Report measured compiler or workload failures
+        if: steps.measure.outcome == 'failure'
+        run: |
+          echo 'Benchmark failures are preserved in the uploaded dataset; this is not a passing compiler validation.'
+          exit 1
+
   aggregate:
     name: Aggregate Multi-Arch Results
     needs: [resolve-xu, benchmark]
+    if: always() && needs.resolve-xu.result == 'success'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -316,7 +325,14 @@ jobs:
               if cases is None:
                   cases = names
               assert names == cases, f"different case coverage: {target}"
-              assert all(row["xu_wall_ms"] > 0 and row["xu_bytes"] > 0 for row in rows), f"missing Xu results: {target}"
+              allowed_failures = {'compile_failed', 'run_failed', 'stdout_mismatch', 'measurement_failed'}
+              for row in rows:
+                  status = row.get('xu_status', 'ok')
+                  if status == 'ok':
+                      assert row['xu_wall_ms'] > 0 and row['xu_bytes'] > 0, f"missing verified Xu result: {target}/{row['name']}"
+                  else:
+                      assert status in allowed_failures and row.get('xu_error'), f"missing failure evidence: {target}/{row['name']}"
+                      assert row['xu_wall_ms'] is None and row['xu_bytes'] is None, f"failed result has metrics: {target}/{row['name']}"
               identity_file = Path("all-reports") / f"benchmark-reports-{target}" / "compiler-identity.json"
               identity = json.loads(identity_file.read_text(encoding="utf-8"))
               assert identity["target"] == target, f"wrong compiler target: {target}"

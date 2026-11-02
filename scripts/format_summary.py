@@ -70,6 +70,25 @@ CATEGORY_NAMES = {
 
 
 def parse_crosslang_txt(content: str) -> dict:
+    records = re.findall(r'^# result: (.+)$', content, re.M)
+    if records:
+        results = {}
+        for raw in records:
+            record = json.loads(raw)
+            name, impl = record.pop('bench'), record.pop('impl')
+            if impl in results.setdefault(name, {}):
+                raise ValueError(f'duplicate runtime result: {name}/{impl}')
+            if record['status'] != 'ok':
+                if record['status'] not in {'compile_failed', 'run_failed', 'stdout_mismatch', 'measurement_failed'}:
+                    raise ValueError(f'unknown result status: {name}/{impl}')
+                record = {key: record[key] for key in ('status', 'error')}
+            results[name][impl] = record
+        # Registry order is independent of the implementation scheduling order.
+        selected = re.search(r'^# benches: (.+)$', content, re.M)
+        names = selected[1].split(', ') if selected else list(results)
+        if set(names) != set(results):
+            raise ValueError('runtime results do not cover the requested workloads')
+        return {name: results[name] for name in names}
     pat = re.compile(
         r"^(.+?)\s+([a-z0-9_]+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+)\s+OK(?:\s|$)",
         re.M,
@@ -101,8 +120,8 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
     benches = []
     for name, implementations in results.items():
         xu = implementations.get("Xu")
-        if not xu:
-            continue
+        if xu is None:
+            raise ValueError(f'missing Xu outcome: {name}')
         def select_best_opt(prefix):
             choices = [implementations[name] for name in (f"{prefix} -O{i}" for i in (1, 2, 3))
                        if name in implementations and isinstance(implementations[name].get("wall_ms"), (int, float))
@@ -128,14 +147,16 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
             "desc_zh": desc_zh,
             "desc_en": desc_en,
             "category": category,
-            "xu_wall_ms": xu["wall_ms"],
-            "xu_best_ms": xu["best_ms"],
-            "xu_rss_mib": xu["rss_mib"],
-            "xu_bytes": xu["bytes"],
+            "xu_status": xu.get("status", "ok"),
+            "xu_error": xu.get("error"),
+            "xu_wall_ms": xu.get("wall_ms"),
+            "xu_best_ms": xu.get("best_ms"),
+            "xu_rss_mib": xu.get("rss_mib"),
+            "xu_bytes": xu.get("bytes"),
             "c_wall_ms": c_opt["wall_ms"] if c_opt else None,
             "rust_wall_ms": rust_opt["wall_ms"] if rust_opt else None,
-            "go_wall_ms": go_opt["wall_ms"] if go_opt else None,
-            "swift_wall_ms": swift_opt["wall_ms"] if swift_opt else None,
+            "go_wall_ms": go_opt.get("wall_ms") if go_opt else None,
+            "swift_wall_ms": swift_opt.get("wall_ms") if swift_opt else None,
             "ratio_vs_c": calc_ratio(c_opt),
             "ratio_vs_rust": calc_ratio(rust_opt),
             "ratio_vs_go": calc_ratio(go_opt),
@@ -152,6 +173,7 @@ def build_benchmark_payload(results: dict, meta: dict | None = None) -> dict:
             "platform_name": meta.get("platform_name", f"{meta.get('os')} ({meta.get('arch')})"),
             "xu_version": meta.get("xu_version", "0.8.8"),
             "total_benches": len(benches),
+            "xu_failed_benches": sum(b['xu_status'] != 'ok' for b in benches),
             "rss_method": meta.get("rss_method", "unrecorded"),
             "toolchains": meta.get("toolchains", {}),
             "methodology": "Whole-program wall time, 7 iterations median; Linux RSS from separate post-exec tracing, macOS wait4, Windows peak working set; verified stdout",
@@ -192,7 +214,9 @@ def generate_markdown_summary(payload: dict) -> str:
         rust_str = f"{item['rust_wall_ms']:.1f}ms" if item['rust_wall_ms'] else "—"
         go_str = f"{item['go_wall_ms']:.1f}ms" if item['go_wall_ms'] else "—"
         note = ""
-        if kb == "startup":
+        if item['xu_wall_ms'] is None:
+            note = item['xu_status']
+        elif kb == "startup":
             note = f"极速冷启动，领先 Go {round((item['go_wall_ms']/item['xu_wall_ms']-1)*100)}%" if item['go_wall_ms'] else "极速原生冷启动"
         elif kb == "chan_ping":
             note = "原生轻量协程与 Channel 高性能调度"
@@ -200,7 +224,8 @@ def generate_markdown_summary(payload: dict) -> str:
             note = "SROA 字段标量展开消除冗余访问"
         elif kb == "aes128_encrypt":
             note = "纯软件算法实现，表现稳健"
-        lines.append(f"| **{item['desc_zh']}** (`{kb}`) | **{item['xu_wall_ms']:.2f}ms** | {go_str} | {c_str} | {rust_str} | {note} |")
+        xu_str = f"{item['xu_wall_ms']:.2f}ms" if item['xu_wall_ms'] is not None else item['xu_status']
+        lines.append(f"| **{item['desc_zh']}** (`{kb}`) | **{xu_str}** | {go_str} | {c_str} | {rust_str} | {note} |")
 
     lines.extend([
         "",
@@ -216,8 +241,9 @@ def generate_markdown_summary(payload: dict) -> str:
         rust_val = f"{b['rust_wall_ms']:.2f}" if b['rust_wall_ms'] is not None else "—"
         go_val = f"{b['go_wall_ms']:.2f}" if b['go_wall_ms'] is not None else "—"
         ratio_c = f"{b['ratio_vs_c']}×" if b['ratio_vs_c'] is not None else "—"
+        xu_val = f"{b['xu_wall_ms']:.2f}" if b['xu_wall_ms'] is not None else b['xu_status']
         lines.append(
-            f"| {cat_zh} | `{b['name']}`<br><small>{b['desc_zh']}</small> | **{b['xu_wall_ms']:.2f}** | {go_val} | {c_val} | {rust_val} | {ratio_c} |"
+            f"| {cat_zh} | `{b['name']}`<br><small>{b['desc_zh']}</small> | **{xu_val}** | {go_val} | {c_val} | {rust_val} | {ratio_c} |"
         )
 
     lines.append("")
@@ -246,7 +272,9 @@ def generate_multi_arch_summary(aggregated: dict) -> str:
         os_str = pmeta.get("os", pid)
         arch_str = pmeta.get("arch", "")
         count = len(pdata.get("benches", []))
-        lines.append(f"| **`{pid}`** | {os_str} | `{arch_str}` | {count} 项 | ✅ 测试通过 |")
+        failed = pmeta.get('xu_failed_benches', 0)
+        status = f'⚠️ Xu {failed} 项失败' if failed else '✅ 输出校验通过'
+        lines.append(f"| **`{pid}`** | {os_str} | `{arch_str}` | {count} 项 | {status} |")
 
     lines.extend([
         "",
