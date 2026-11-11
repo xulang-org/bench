@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command O0–O3 comparison: runtime + RSS/CPU/size/curves + compile + Xu --timings.
+# One-command default/no-opt comparison: runtime + RSS/CPU/size/curves + compile + Xu --timings.
 #
 # Writes reports/bench_opt_levels.latest.txt and .curves/.
 # Extra args are forwarded to bench_opt_levels.sh (e.g. --benches=loop_sum).

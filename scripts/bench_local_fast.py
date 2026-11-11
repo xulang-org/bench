@@ -68,7 +68,7 @@ def bench_xu_linux_docker(bench_name, target_arch="x64", iters=3):
     env["XU_STDLIB_ROOT"] = str(XU_SRC)
 
     build_cmd = [
-        str(XU_BIN), "build", "-O3",
+        str(XU_BIN), "build",
         "--target", xu_target,
         str(src_xu), "-o", bin_path
     ]
@@ -120,7 +120,7 @@ def bench_xu_macos(bench_name, iters=3):
     bin_path = Path("/tmp") / f"{bench_name}_mac"
     env = os.environ.copy()
     env["XU_STDLIB_ROOT"] = str(XU_SRC)
-    build_cmd = [str(XU_BIN), "build", "-O3", str(src_xu), "-o", str(bin_path)]
+    build_cmd = [str(XU_BIN), "build", str(src_xu), "-o", str(bin_path)]
     p_build = subprocess.run(build_cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if p_build.returncode != 0:
         return None, f"Build error: {p_build.stderr}"

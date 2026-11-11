@@ -2,6 +2,7 @@
 *.md whitespace=-blank-at-eol
 
 # Golden output is compared byte for byte, including padding and final lines.
+tests/bench/osprey/golden/*.txt text eol=lf
 tests/**/expected.txt -whitespace
 tests/**/expected.stdout -whitespace
 tests/**/expected.stderr -whitespace

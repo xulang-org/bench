@@ -42,7 +42,7 @@ else
 fi
 [ -x "$GEN3" ] || { echo "bench_runtime: compiler is not executable: $GEN3"; exit 1; }
 GEN3_LANE="product"
-echo "bench_runtime: lane=product (O0 vs default optimization)" >&2
+echo "bench_runtime: lane=product (no-opt vs default optimization)" >&2
 
 compile_product() {
     # Keep the compiler boundary in one place.  This also clears ambient
@@ -76,7 +76,7 @@ sys.stderr.write("%d\n" % int(best * 1000))
 PY
 
 echo "bench_runtime: xu=$GEN3 iters=$ITERS (best-of) host=$(uname -sm)"
-printf "%-16s %12s %12s %8s  %s\n" "bench" "O0_ms" "product_ms" "ratio" "checksum"
+printf "%-16s %12s %12s %8s  %s\n" "bench" "no-opt_ms" "product_ms" "ratio" "checksum"
 
 fail=0
 compat=0
@@ -85,8 +85,8 @@ for src in "$BENCH_ROOT"/tests/bench/*.xu; do
     name=$(basename "$src" .xu)
     run_dir="$tmp/run/$name"
     mkdir -p "$run_dir"
-    if ! "$PRODUCT_COMPILER_RUNNER" "$GEN3" build -O0 "$src" -o "$tmp/${name}_boot.bin" 2>"$tmp/${name}.cerr"; then
-        echo "$name: O0 compile FAIL"; head -2 "$tmp/${name}.cerr"; fail=1; continue
+    if ! "$PRODUCT_COMPILER_RUNNER" "$GEN3" build --no-opt "$src" -o "$tmp/${name}_boot.bin" 2>"$tmp/${name}.cerr"; then
+        echo "$name: no-opt compile FAIL"; head -2 "$tmp/${name}.cerr"; fail=1; continue
     fi
     if ! compile_product "$src" -o "$tmp/${name}_gen3.bin" 2>>"$tmp/${name}.cerr"; then
         echo "$name: gen3 compile FAIL"; head -2 "$tmp/${name}.cerr"; fail=1; continue
@@ -96,7 +96,7 @@ for src in "$BENCH_ROOT"/tests/bench/*.xu; do
     ms_b="-"
     chmod +x "$tmp/${name}_boot.bin"
     out_b=$(python3 "$tmp/timer.py" "$tmp/${name}_boot.bin" "$ITERS" "$run_dir" 2>"$tmp/${name}_boot.ms") \
-        || { echo "$name: O0 run FAIL"; fail=1; continue; }
+        || { echo "$name: no-opt run FAIL"; fail=1; continue; }
     ms_b=$(cat "$tmp/${name}_boot.ms")
     out_g=$(python3 "$tmp/timer.py" "$tmp/${name}_gen3.bin" "$ITERS" "$run_dir" 2>"$tmp/${name}_gen3.ms") \
         || { echo "$name: gen3 run FAIL"; fail=1; continue; }
@@ -137,7 +137,7 @@ done
 if [ "$MODE" = "save" ]; then
     {
         echo "# bench_runtime baseline — $(date '+%Y-%m-%d') host: $(uname -sm)"
-        echo "# lane=product (O0 vs default optimization)"
+        echo "# lane=product (no-opt vs default optimization)"
         echo "# Fields: name boot=<ms> gen3=<ms> sha=<output checksum>. Re-record"
         echo "# (scripts/bench_runtime.sh --save) only after intended codegen changes."
         printf '%s' "$lines"

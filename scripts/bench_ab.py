@@ -3,7 +3,7 @@
 
 Usage:
   python3 scripts/bench_ab.py --old ../xu/bin/xu --new /tmp/xu-candidate
-  python3 scripts/bench_ab.py --old A --new B --opts 1,2 --benches loop_sum,matmul
+  python3 scripts/bench_ab.py --old A --new B --modes default,no-opt --benches loop_sum,matmul
 
 Both compilers build every bench with the same hermetic environment
 (XU_STDLIB_ROOT=<xu>/src, empty XUPATH). Candidate compilers usually lack
@@ -36,9 +36,10 @@ OLD = (levels.IMPL_XU, 1)
 NEW = (levels.IMPL_XU, 2)
 
 
-def build(xu: Path, src: Path, opt: int, out: Path) -> str | None:
+def build(xu: Path, src: Path, mode: str, out: Path) -> str | None:
     env = {**os.environ, "XU_STDLIB_ROOT": str(XU_ROOT / "src"), "XUPATH": ""}
-    p = subprocess.run([str(xu), "build", f"-O{opt}", str(src), "-o", str(out)],
+    flags = ["--no-opt"] if mode == "no-opt" else []
+    p = subprocess.run([str(xu), "build", *flags, str(src), "-o", str(out)],
                        cwd=BENCH_ROOT, env=env, capture_output=True, text=True)
     if p.returncode != 0 or not out.exists():
         return (p.stderr or p.stdout or "no binary")[-300:].replace("\n", " ")
@@ -70,7 +71,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--old", required=True, type=Path)
     ap.add_argument("--new", required=True, type=Path)
-    ap.add_argument("--opts", default="1", help="comma-separated -O levels (default 1)")
+    ap.add_argument("--modes", default="default", help="comma-separated modes: default, no-opt")
     ap.add_argument("--benches", default="", help="comma-separated names (default: all)")
     ap.add_argument("--iters", type=int, default=9)
     ap.add_argument("--frac", type=float, default=0.05)
@@ -80,20 +81,22 @@ def main() -> int:
     args = ap.parse_args()
 
     names = [n for n in args.benches.split(",") if n] or sorted(p.stem for p in BENCH_DIR.glob("*.xu"))
-    opts = [int(o) for o in args.opts.split(",")]
+    modes = args.modes.split(",")
+    if any(mode not in {"default", "no-opt"} for mode in modes):
+        ap.error("--modes accepts default and no-opt")
     regressions: list[str] = []
     failures: list[str] = []
-    print(f"{'bench':24} {'O':>2} {'old_ms':>9} {'new_ms':>9} {'ratio':>7}  verdict")
+    print(f"{'bench':24} {'mode':>7} {'old_ms':>9} {'new_ms':>9} {'ratio':>7}  verdict")
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         for name in names:
             src = BENCH_DIR / f"{name}.xu"
-            for opt in opts:
-                o, n = tmp / f"{name}.O{opt}.old", tmp / f"{name}.O{opt}.new"
-                eo, en = build(args.old.resolve(), src, opt, o), build(args.new.resolve(), src, opt, n)
-                row = f"{name:24} {opt:>2}"
+            for mode in modes:
+                o, n = tmp / f"{name}.{mode}.old", tmp / f"{name}.{mode}.new"
+                eo, en = build(args.old.resolve(), src, mode, o), build(args.new.resolve(), src, mode, n)
+                row = f"{name:24} {mode:>7}"
                 if eo or en:
-                    failures.append(f"{name} O{opt}: build old={'fail' if eo else 'ok'} new={'fail' if en else 'ok'}")
+                    failures.append(f"{name} {mode}: build old={'fail' if eo else 'ok'} new={'fail' if en else 'ok'}")
                     print(f"{row} {'-':>9} {'-':>9} {'-':>7}  build: old={eo or 'ok'} new={en or 'ok'}")
                     continue
                 if not args.time_identical and o.read_bytes() == n.read_bytes():
@@ -105,7 +108,7 @@ def main() -> int:
                     continue
                 old_s, new_s, err = measure(o, n, expect, args.iters)
                 if err:
-                    failures.append(f"{name} O{opt}: {err}")
+                    failures.append(f"{name} {mode}: {err}")
                     print(f"{row} {'-':>9} {'-':>9} {'-':>7}  FAIL {err}")
                     continue
                 slow = new_s > old_s * (1 + args.frac) and (new_s - old_s) * 1000 > args.abs_ms
@@ -115,7 +118,7 @@ def main() -> int:
                     slow = not err and new_s > old_s * (1 + args.frac) and (new_s - old_s) * 1000 > args.abs_ms
                     verdict = "REGRESSION" if slow else "ok (not confirmed on re-run)"
                     if slow:
-                        regressions.append(f"{name} O{opt}")
+                        regressions.append(f"{name} {mode}")
                 elif new_s < old_s * (1 - args.frac) and (old_s - new_s) * 1000 > args.abs_ms:
                     verdict = "faster"
                 ratio = new_s / old_s if old_s > 0 else 0.0
