@@ -130,7 +130,7 @@ def timed_interleaved(
             before_run()
         timeout = INITIAL_TIMEOUT_S
         # Keep watchdog/thread overhead identical for measured Xu tiers.
-        # Before the O1 anchor exists, use a bounded calibration deadline.
+        # Before the optimized anchor exists, use a bounded calibration deadline.
         if key[0] == IMPL_XU and o1_s is not None:
             timeout = max(o1_s * TIER_TIMEOUT_X, 1.0)
         s = run_one([str(bins[key])], sample_interval_s=interval,
@@ -564,7 +564,7 @@ def main() -> int:
     )
     log("# sampling: warm all tiers, interleave rounds with rotating/reversed order; RSS curve runs separate")
     if gate:
-        log("# gate sampling: minimum 21 rounds when warmed O1 CPU <40ms (or calibration unavailable); thresholds unchanged")
+        log("# gate sampling: minimum 21 rounds when warmed optimized CPU <40ms (or calibration unavailable)")
     if args.no_compile_times:
         log("# compile timing: off (single untimed compile)")
     else:
@@ -657,8 +657,9 @@ def main() -> int:
             log(f"{bench.name:<18} {IMPL_XU:<8}  MISSING {src_xu}")
             fail = 1
             continue
+        xu_suffix = ".exe" if sys.platform == "win32" else ".xin"
         for opt in XU_MODES:
-            out = tmp / f"xu_{bench.name}.{opt_label(opt, IMPL_XU)}.xin"
+            out = tmp / f"xu_{bench.name}.{opt_label(opt, IMPL_XU)}{xu_suffix}"
             if not do_compile(
                 IMPL_XU,
                 bench.name,
@@ -865,8 +866,8 @@ def main() -> int:
             emit_xu_over(name, impl, "CPU (median)", "med_cpu_s", table, cell_attr)
 
         log("")
-        log("## speedup vs own -O0 (median wall; >1 faster than own O0)")
-        log(f"{'bench':<18} {'impl':<8} {'O1':>8} {'O2':>8} {'O3':>8}")
+        log("## speedup vs own unoptimized mode (median wall)")
+        log(f"{'bench':<18} {'impl':<8} {'O1/default':>10} {'O2':>8} {'O3':>8}")
         for bench in selected:
             for impl in impls_order:
                 row = table[impl].get(bench.name, {})
@@ -878,7 +879,7 @@ def main() -> int:
                     c = r.get(opt)
                     return "—" if c is None else speedup(b.stats.med_s, c.stats.med_s)
 
-                log(f"{bench.name:<18} {impl:<8} {sp(1):>8} {sp(2):>8} {sp(3):>8}")
+                log(f"{bench.name:<18} {impl:<8} {sp(1):>10} {sp(2):>8} {sp(3):>8}")
 
         if curves_dir is not None and curves_by_bench:
             log("")

@@ -118,11 +118,12 @@ def main() -> int:
 
     src = xu_src(args.bench)
     flags = [] if args.ra is None else [f"--ra={args.ra}"]
+    suffix = ".exe" if sys.platform == "win32" else ".xin"
     with tempfile.TemporaryDirectory(prefix="xu-opt-bisect-") as directory:
         work = Path(directory)
         results = {}
         for mode, options in (("default", flags), ("no-opt", [*flags, "--no-opt"])):
-            out = work / f"{mode}.xin"
+            out = work / f"{mode}{suffix}"
             if args.time:
                 result = compile_run_med(src, options, out, bench.expect, args.timeout, args.iters)
             else:
@@ -142,7 +143,7 @@ def main() -> int:
                 for stage in PASSES:
                     ok, message, wall = compile_run(
                         src, [*flags, "--opt-stop", stage, "--dump-opt-stages", str(dump)],
-                        work / f"{stage}.xin", bench.expect, args.timeout)
+                        work / f"{stage}{suffix}", bench.expect, args.timeout)
                     print(f"  stop={stage:<18} {message:40} {wall * 1000:8.1f}ms")
                     if not ok:
                         break

@@ -75,6 +75,7 @@ def run_xu_timings(xu: Path, benches) -> str:
         capture_output=True, text=True, check=True,
     )
     phase_flags = ["--timings"] if "--timings" in help_result.stdout else []
+    suffix = ".exe" if sys.platform == "win32" else ".xin"
     lines = [
         f"{TIMINGS_MARK} (one shot per mode; product {xu})",
         f"{'bench':<18} {'mode':<7} "
@@ -89,7 +90,7 @@ def run_xu_timings(xu: Path, benches) -> str:
                 continue
             for mode in MODES:
                 flags = ["--no-opt"] if mode == "no-opt" else []
-                out = tmp / f"{bench.name}.{mode}.xin"
+                out = tmp / f"{bench.name}.{mode}{suffix}"
                 started = time.perf_counter()
                 p = subprocess.run(
                     product_compile_argv(xu, "build", *phase_flags, *flags, str(src), "-o", str(out), runner=HOSTED_RUNNER),
