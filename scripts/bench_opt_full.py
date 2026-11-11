@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -21,7 +22,7 @@ from product_compiler import resolve_product_compiler as resolve_hosted_compiler
 LANE = "product"
 SNAPSHOT = BENCH_ROOT / "reports" / "bench_opt_levels.latest.txt"
 TIMINGS_MARK = "## xu product --timings"
-OPTS = (0, 1, 2, 3)
+MODES = ("default", "no-opt")
 DIGEST_HEADINGS = (
     "## wall median ms",
     "## peak RSS median MiB",
@@ -69,9 +70,15 @@ def snapshot_benches(path: Path, xu: Path):
 
 def run_xu_timings(xu: Path, benches) -> str:
     ensure_xupath()
+    help_result = subprocess.run(
+        product_compile_argv(xu, "build", "--help", runner=HOSTED_RUNNER),
+        capture_output=True, text=True, check=True,
+    )
+    phase_flags = ["--timings"] if "--timings" in help_result.stdout else []
+    suffix = ".exe" if sys.platform == "win32" else ".xin"
     lines = [
-        f"{TIMINGS_MARK} (one shot per -On; product {xu})",
-        f"{'bench':<18} {'opt':<4} "
+        f"{TIMINGS_MARK} (one shot per mode; product {xu})",
+        f"{'bench':<18} {'mode':<7} "
         f"{'load':>6} {'parse':>6} {'check':>6} {'mir':>6} {'emit':>6} "
         f"{'bin':>6} {'total':>6}",
     ]
@@ -81,21 +88,26 @@ def run_xu_timings(xu: Path, benches) -> str:
             src = xu_src(bench.name)
             if not src.is_file():
                 continue
-            for opt in OPTS:
-                out = tmp / f"{bench.name}.O{opt}.xin"
+            for mode in MODES:
+                flags = ["--no-opt"] if mode == "no-opt" else []
+                out = tmp / f"{bench.name}.{mode}{suffix}"
+                started = time.perf_counter()
                 p = subprocess.run(
-                    product_compile_argv(xu, "build", "--timings", f"-O{opt}", str(src), "-o", str(out), runner=HOSTED_RUNNER),
+                    product_compile_argv(xu, "build", *phase_flags, *flags, str(src), "-o", str(out), runner=HOSTED_RUNNER),
                     capture_output=True,
                     text=True,
                 )
                 blob = (p.stderr or "") + "\n" + (p.stdout or "")
                 t = parse_timings(blob)
-                if p.returncode != 0 or t is None:
+                if p.returncode != 0 or (phase_flags and t is None):
                     err = (p.stderr or p.stdout or "fail")[-80:].replace("\n", " ")
-                    lines.append(f"{bench.name:<18} O{opt:<3}  FAIL {err}")
+                    lines.append(f"{bench.name:<18} {mode:<7}  FAIL {err}")
                     continue
+                if t is None:
+                    t = dict.fromkeys(("load", "parse", "check", "mir", "emit", "bin"), "—")
+                    t["total"] = str(round((time.perf_counter() - started) * 1000))
                 lines.append(
-                    f"{bench.name:<18} O{opt:<3} "
+                    f"{bench.name:<18} {mode:<7} "
                     f"{t['load']:>6} {t['parse']:>6} {t['check']:>6} "
                     f"{t['mir']:>6} {t['emit']:>6} {t['bin']:>6} {t['total']:>6}"
                 )
@@ -103,8 +115,8 @@ def run_xu_timings(xu: Path, benches) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
     lines.append("")
     lines.append(
-        "# Phase times are milliseconds from one compilation per tier; "
-        "compare the measured columns before attributing optimization overhead."
+        "# Phase times are milliseconds from one compilation per mode; "
+        "compilers without phase reporting show end-to-end compile time only."
     )
     return "\n".join(lines) + "\n"
 

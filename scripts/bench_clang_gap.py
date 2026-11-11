@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Archived, fail-closed Xu/Clang O3 comparison for the fixed 28-item suite.
+"""Archived, fail-closed default Xu / Clang O3 comparison for the fixed 28-item suite.
 
 The default run covers all 28 items. --benches is for explicitly labelled
 smokes only; its output is never a full-suite baseline.
@@ -135,7 +135,7 @@ def main() -> int:
                 binary = out / 'artifacts' / f'{safe}-{label}{suffix}'
                 source = ROOT / (entry['c_source'] if label == 'clang-O3' else entry['xu_source'])
                 argv = ([args.clang, '-O3', str(source), '-o', str(binary), '-lm'] if label == 'clang-O3'
-                        else product_compile_argv(compilers[label], 'build', str(source), '-O3', '-o', str(binary), runner=PRODUCT_RUNNER))
+                        else product_compile_argv(compilers[label], 'build', str(source), '-o', str(binary), runner=PRODUCT_RUNNER))
                 compiled = cmd(argv)
                 if compiled.returncode != 0 or not binary.is_file():
                     raise RuntimeError(f'{name}/{label}: compile failed: {compiled.stderr.decode(errors="replace")[-2000:]}')

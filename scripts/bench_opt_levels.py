@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Xu vs Clang vs Go vs Rustc vs Swiftc runtime + resource sweep.
 
-Xu / Clang / rustc: explicit -O0..-O3.
+Xu: default and --no-opt. Clang and rustc keep their own optimization levels.
 Go: O0 = -gcflags=all=-N -l; O1=O2=O3 = go build (one binary).
 Swift: O0 = -Onone; O1=O2=O3 = -O (one binary).
 
@@ -64,18 +64,8 @@ LANE = "product"
 SNAPSHOT = BENCH_ROOT / "reports" / "bench_opt_levels.latest.txt"
 GATE_BENCHES = "loop_sum,sha256_chain,sort_lcg,iface_sum,match_sum"
 OPTS = (0, 1, 2, 3)
-# Extra Xu cells (opt code, MIR -O, extra argv, label).
-# 4 = --no-regcache; 12 = MIR-O1 + RA-O2; 21 = MIR-O2 + RA-O1.
-XU_SPLIT = (
-    (4, 1, ["--no-regcache"], "nrc"),
-    (12, 1, ["--ra=2"], "m1r2"),
-    (21, 2, ["--ra=1"], "m2r1"),
-)
-O3_OVER_O2_GATE = 1.1
-# O2/O3 may not be slower than O1 by both 5% and 0.5ms (P50).
-O2_OVER_O1_FRAC = 1.05
-O2_OVER_O1_S = 0.0005
-# Same-tier timeout vs default (O1): 5× median, at least 1s.
+XU_MODES = (0, 1)
+# Per-mode timeout relative to the default build: 5× median, at least 1s.
 TIER_TIMEOUT_X = 5.0
 # A deadlocked first anchor must not hold the entire suite indefinitely.
 INITIAL_TIMEOUT_S = 60.0
@@ -85,11 +75,11 @@ SHORT_CPU_S = 0.040
 WALL_CPU_SKIP = frozenset({"chan_ping"})
 
 
-def opt_label(opt: int) -> str:
-    for code, _mir, _extra, lab in XU_SPLIT:
-        if code == opt:
-            return lab
+def opt_label(opt: int, impl: str) -> str:
+    if impl == IMPL_XU:
+        return "no-opt" if opt == 0 else "default"
     return f"O{opt}"
+
 
 IMPL_XU = "xu"
 IMPL_CLANG = "clang"
@@ -140,7 +130,7 @@ def timed_interleaved(
             before_run()
         timeout = INITIAL_TIMEOUT_S
         # Keep watchdog/thread overhead identical for measured Xu tiers.
-        # Before the O1 anchor exists, use a bounded calibration deadline.
+        # Before the optimized anchor exists, use a bounded calibration deadline.
         if key[0] == IMPL_XU and o1_s is not None:
             timeout = max(o1_s * TIER_TIMEOUT_X, 1.0)
         s = run_one([str(bins[key])], sample_interval_s=interval,
@@ -238,7 +228,7 @@ def xu_compile_argv(compiler: Path, src: Path, opt: int, out: Path,
                     extra: list[str] | None = None, *, lane: str = LANE) -> list[str]:
     if lane != "product":
         raise ValueError(f"unsupported compiler lane: {lane}")
-    return product_compile_argv(compiler, "build", str(src), f"-O{opt}",
+    return product_compile_argv(compiler, "build", str(src), *(("--no-opt",) if opt == 0 else ()),
                                 *(extra or []), "-o", str(out), runner=PRODUCT_COMPILER_RUNNER)
 
 
@@ -420,7 +410,7 @@ def main() -> int:
     ap.add_argument(
         "--check",
         action="store_true",
-        help="fail on Xu stdout MISMATCH, timeout, wall≫CPU wait, or O2/O3 slower than O1",
+        help="fail on Xu stdout MISMATCH, timeout, or wall≫CPU wait",
     )
     ap.add_argument("--quick", action="store_true", help=f"gate subset ({GATE_BENCHES})")
     ap.add_argument("--benches")
@@ -574,7 +564,7 @@ def main() -> int:
     )
     log("# sampling: warm all tiers, interleave rounds with rotating/reversed order; RSS curve runs separate")
     if gate:
-        log("# gate sampling: minimum 21 rounds when warmed O1 CPU <40ms (or calibration unavailable); thresholds unchanged")
+        log("# gate sampling: minimum 21 rounds when warmed optimized CPU <40ms (or calibration unavailable)")
     if args.no_compile_times:
         log("# compile timing: off (single untimed compile)")
     else:
@@ -595,10 +585,7 @@ def main() -> int:
         f"RSS peak={peak_rss_method()}; curve=live poll"
     )
     log(f"# benches: {', '.join(b.name for b in selected)}")
-    log(
-        f"# opts: {', '.join(f'-O{o}' for o in OPTS)}"
-        " + --no-regcache + -O1 --ra=2 + -O2 --ra=1 (Xu)"
-    )
+    log("# Xu modes: default and --no-opt. Peer compilers use their own optimization levels.")
     log("")
 
     table: dict[str, dict[str, dict[int, Cell]]] = {
@@ -642,7 +629,7 @@ def main() -> int:
                 discard_first=args.discard_first,
             )
         if err:
-            log(f"  compile FAIL {impl} {opt_label(opt)} {bench_name}: {err}")
+            log(f"  compile FAIL {impl} {opt_label(opt, impl)} {bench_name}: {err}")
             return False
         add_bin(impl, opt, out)
         if st is not None:
@@ -652,7 +639,7 @@ def main() -> int:
     if not args.skip_runtime:
         log("## runtime + resources + binary size")
         log(
-            f"{'bench':<18} {'impl':<8} {'opt':<4} "
+            f"{'bench':<18} {'impl':<8} {'mode':<7} "
             f"{'best_ms':>8} {'med_ms':>8} {'rss_mib':>8} {'cpu_ms':>8} "
             f"{'bytes':>10}  stdout"
         )
@@ -670,8 +657,9 @@ def main() -> int:
             log(f"{bench.name:<18} {IMPL_XU:<8}  MISSING {src_xu}")
             fail = 1
             continue
-        for opt in OPTS:
-            out = tmp / f"xu_{bench.name}.O{opt}.xin"
+        xu_suffix = ".exe" if sys.platform == "win32" else ".xin"
+        for opt in XU_MODES:
+            out = tmp / f"xu_{bench.name}.{opt_label(opt, IMPL_XU)}{xu_suffix}"
             if not do_compile(
                 IMPL_XU,
                 bench.name,
@@ -679,18 +667,6 @@ def main() -> int:
                 xu_compile_argv(compiler, src_xu, opt, out, lane=lane),
                 out,
             ):
-                fail = 1
-        for code, mir, extra, lab in XU_SPLIT:
-            out = tmp / f"xu_{bench.name}.{lab}.xin"
-            cmd = xu_compile_argv(
-                compiler,
-                src_xu,
-                mir,
-                out,
-                extra=list(extra),
-                lane=lane,
-            )
-            if not do_compile(IMPL_XU, bench.name, code, cmd, out):
                 fail = 1
 
         def try_lang(
@@ -726,12 +702,7 @@ def main() -> int:
         if args.skip_runtime:
             continue
 
-        run_opts = list(OPTS)
-        for code, _mir, _extra, _lab in XU_SPLIT:
-            if (IMPL_XU, code) in bins:
-                run_opts.append(code)
-        run_bins = {key: path for key, path in bins.items()
-                    if key[1] in run_opts and key[0] in impls_order}
+        run_bins = {key: path for key, path in bins.items() if key[0] in impls_order}
         measured, errors = timed_interleaved(
             run_bins, args.iters, discard_first=args.discard_first,
             sample_interval_s=sample_s, cwd=run_dirs[bench.name], expect=expect,
@@ -740,7 +711,7 @@ def main() -> int:
             before_run=(lambda: wait_for_loopback_capacity(bench.loopback_connections)) if bench.loopback_connections else None,
         )
         for (impl, opt), error in errors.items():
-            log(f"  run FAIL {impl} {opt_label(opt)} {bench.name}: {error}")
+            log(f"  run FAIL {impl} {opt_label(opt, impl)} {bench.name}: {error}")
             if impl == IMPL_XU:
                 fail = 1
         for (impl, opt), stats in measured.items():
@@ -749,7 +720,7 @@ def main() -> int:
                 stats=stats, nbytes=path.stat().st_size, path=path,
             )
             if stats.rss_curve:
-                label = f"{impl} -O{opt}"
+                label = f"{impl} {opt_label(opt, impl)}"
                 curves_by_bench.setdefault(bench.name, {})[label] = stats.rss_curve
                 if curves_dir is not None:
                     write_curve_csv(
@@ -767,9 +738,7 @@ def main() -> int:
             row = table[impl].get(bench.name, {})
             if impl != IMPL_XU and not row:
                 continue
-            keys = list(OPTS) + (
-                [c for c, *_ in XU_SPLIT if c in row] if impl == IMPL_XU else []
-            )
+            keys = XU_MODES if impl == IMPL_XU else OPTS
             outs = {
                 opt: row[opt].stats.stdout.encode("utf-8")
                 for opt in keys
@@ -785,7 +754,7 @@ def main() -> int:
                 c = row.get(opt)
                 if c is None:
                     if impl == IMPL_XU:
-                        log(f"{bench.name:<18} {impl:<8} O{opt:<3} {'FAIL':>8}")
+                        log(f"{bench.name:<18} {impl:<8} {opt_label(opt, impl):<7} {'FAIL':>8}")
                     continue
                 if id(c) in printed:
                     continue
@@ -797,11 +766,11 @@ def main() -> int:
                 spark = sparkline(c.stats.rss_curve) if c.stats.rss_curve else ""
                 extra = f"  {spark}" if spark else ""
                 note = " (=O1)" if impl in ALIAS_O1 and opt == 1 else ""
-                olabel = opt_label(opt)
+                olabel = opt_label(opt, impl)
                 wait_ms = (c.stats.med_s - c.stats.med_cpu_s) * 1000.0
                 wait = f" wait={wait_ms:+.1f}ms" if wait_ms > 15.0 else ""
                 log(
-                    f"{bench.name:<18} {impl:<8} {olabel:<4} "
+                    f"{bench.name:<18} {impl:<8} {olabel:<7} "
                     f"{c.stats.best_s * 1000:8.1f} {c.stats.med_s * 1000:8.1f} "
                     f"{c.stats.med_rss_mib:8.2f} {c.stats.med_cpu_s * 1000:8.1f} "
                     f"{c.nbytes:10d}  {status}{note}{extra}{wait}"
@@ -812,7 +781,7 @@ def main() -> int:
         log(f"## {title}")
         log(
             f"{'bench':<18} {'impl':<8} "
-            f"{'O0':>10} {'O1':>10} {'O2':>10} {'O3':>10}"
+            f"{'O0/no-opt':>10} {'O1/default':>10} {'O2':>10} {'O3':>10}"
         )
         for bench in selected:
             for impl in impls_order:
@@ -859,19 +828,17 @@ def main() -> int:
     ) -> None:
         log("")
         log(f"## Xu / {peer} {title} (>1 Xu higher)")
-        log(f"{'bench':<18} {'O0':>8} {'O1':>8} {'O2':>8} {'O3':>8}")
+        log(f"{'bench':<18} {'no-opt/O0':>12} {'default/O1':>12}")
         for bench in selected:
             xu_row = src[IMPL_XU].get(bench.name, {})
             other = src[peer_impl].get(bench.name, {})
             if not other:
-                log(f"{bench.name:<18} {'—':>8} {'—':>8} {'—':>8} {'—':>8}")
+                log(f"{bench.name:<18} {'—':>12} {'—':>12}")
                 continue
             log(
                 f"{bench.name:<18} "
-                f"{ratio_num(cell_get(xu_row, 0, attr), cell_get(other, 0, attr)):>8} "
-                f"{ratio_num(cell_get(xu_row, 1, attr), cell_get(other, 1, attr)):>8} "
-                f"{ratio_num(cell_get(xu_row, 2, attr), cell_get(other, 2, attr)):>8} "
-                f"{ratio_num(cell_get(xu_row, 3, attr), cell_get(other, 3, attr)):>8}"
+                f"{ratio_num(cell_get(xu_row, 0, attr), cell_get(other, 0, attr)):>12} "
+                f"{ratio_num(cell_get(xu_row, 1, attr), cell_get(other, 1, attr)):>12}"
             )
 
     def ct_attr(row: dict[int, RunStats], opt: int, attr: str) -> float | None:
@@ -899,8 +866,8 @@ def main() -> int:
             emit_xu_over(name, impl, "CPU (median)", "med_cpu_s", table, cell_attr)
 
         log("")
-        log("## speedup vs own -O0 (median wall; >1 faster than own O0)")
-        log(f"{'bench':<18} {'impl':<8} {'O1':>8} {'O2':>8} {'O3':>8}")
+        log("## speedup vs own unoptimized mode (median wall)")
+        log(f"{'bench':<18} {'impl':<8} {'O1/default':>10} {'O2':>8} {'O3':>8}")
         for bench in selected:
             for impl in impls_order:
                 row = table[impl].get(bench.name, {})
@@ -912,7 +879,7 @@ def main() -> int:
                     c = r.get(opt)
                     return "—" if c is None else speedup(b.stats.med_s, c.stats.med_s)
 
-                log(f"{bench.name:<18} {impl:<8} {sp(1):>8} {sp(2):>8} {sp(3):>8}")
+                log(f"{bench.name:<18} {impl:<8} {sp(1):>10} {sp(2):>8} {sp(3):>8}")
 
         if curves_dir is not None and curves_by_bench:
             log("")
@@ -923,34 +890,8 @@ def main() -> int:
                 write_rss_svg(svg, series, title=f"{bench_name} RSS over time")
                 log(f"  {svg}  ({len(series)} series)")
 
-        ls = table[IMPL_XU].get("loop_sum", {})
-        c2, c3 = ls.get(2), ls.get(3)
-        if c2 is not None and c3 is not None:
-            ms2 = c2.stats.med_s * 1000.0
-            ms3 = c3.stats.med_s * 1000.0
-            log("")
-            log(
-                f"loop_sum xu O2 med={ms2:.1f}ms (best {c2.stats.best_s * 1000:.1f})  "
-                f"O3 med={ms3:.1f}ms (best {c3.stats.best_s * 1000:.1f})  "
-                f"(gate: O3 median <= O2 × {O3_OVER_O2_GATE})"
-            )
-            if args.check and ms3 > ms2 * O3_OVER_O2_GATE:
-                log(
-                    f"  REGRESSION: loop_sum O3 {ms3:.1f}ms > O2 {ms2:.1f}ms "
-                    f"×{O3_OVER_O2_GATE}"
-                )
-                fail = 1
-        elif args.check and any(b.name == "loop_sum" for b in selected):
-            log("  REGRESSION: loop_sum O2/O3 timings missing")
-            fail = 1
-
         if args.check:
             log("")
-            log(
-                f"# O2/O3 vs O1 (all benches): "
-                f"P50 must not exceed O1 by {O2_OVER_O1_FRAC}× "
-                f"and {O2_OVER_O1_S * 1000:.1f}ms"
-            )
             log(
                 f"# wall vs CPU: extra >{WALL_OVER_CPU_S * 1000:.0f}ms idle "
                 f"when CPU <{SHORT_CPU_S * 1000:.0f}ms fails "
@@ -958,25 +899,9 @@ def main() -> int:
             )
             for bench in selected:
                 row = table[IMPL_XU].get(bench.name, {})
-                c1 = row.get(1)
-                if c1 is not None:
-                    for opt in (2, 3):
-                        cx = row.get(opt)
-                        if cx is None:
-                            continue
-                        o1 = c1.stats.med_s
-                        ox = cx.stats.med_s
-                        if ox > o1 * O2_OVER_O1_FRAC and (ox - o1) > O2_OVER_O1_S:
-                            log(
-                                f"  REGRESSION: {bench.name} {opt_label(opt)} "
-                                f"{ox * 1000:.1f}ms > O1 {o1 * 1000:.1f}ms "
-                                f"(+{(ox / o1 - 1) * 100:.1f}%)"
-                            )
-                            fail = 1
                 if bench.name in WALL_CPU_SKIP:
                     continue
-                keys = list(OPTS) + [c for c, *_ in XU_SPLIT if c in row]
-                for opt in keys:
+                for opt in XU_MODES:
                     cx = row.get(opt)
                     if cx is None:
                         continue
@@ -984,7 +909,7 @@ def main() -> int:
                     cpu = cx.stats.med_cpu_s
                     if cpu < SHORT_CPU_S and wall > cpu + WALL_OVER_CPU_S:
                         log(
-                            f"  REGRESSION: {bench.name} {opt_label(opt)} "
+                            f"  REGRESSION: {bench.name} {opt_label(opt, IMPL_XU)} "
                             f"wall {wall * 1000:.1f}ms vs CPU {cpu * 1000:.1f}ms "
                             f"(+{(wall - cpu) * 1000:.1f}ms idle)"
                         )
@@ -1002,7 +927,7 @@ def main() -> int:
             f"best+median of {args.compile_iters} discard-first={disc}"
         )
         log(
-            f"{'bench':<18} {'impl':<8} {'opt':<4} "
+            f"{'bench':<18} {'impl':<8} {'mode':<7} "
             f"{'best_ms':>8} {'med_ms':>8} {'rss_mib':>8} {'cpu_ms':>8}"
         )
         for bench in selected:
@@ -1020,7 +945,7 @@ def main() -> int:
                     printed.add(id(s))
                     note = " (=O1)" if impl in ALIAS_O1 and opt == 1 else ""
                     log(
-                        f"{bench.name:<18} {impl:<8} O{opt:<3} "
+                        f"{bench.name:<18} {impl:<8} {opt_label(opt, impl):<7} "
                         f"{s.best_s * 1000:8.1f} {s.med_s * 1000:8.1f} "
                         f"{s.med_rss_mib:8.1f} {s.med_cpu_s * 1000:8.1f}{note}"
                     )

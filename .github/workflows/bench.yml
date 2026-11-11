@@ -161,11 +161,18 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Clang & OS tools (Linux)
+      - name: Ensure Clang is available (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang llvm
+          if ! command -v clang >/dev/null; then
+            if [ -x ../xu/scripts/install_ubuntu_ci_packages.sh ]; then
+              ../xu/scripts/install_ubuntu_ci_packages.sh clang
+            else
+              sudo apt-get update
+              sudo apt-get install -y clang
+            fi
+          fi
+          clang --version
 
       - name: Rebuild the selected Xu commit from a published hosted seed
         env:

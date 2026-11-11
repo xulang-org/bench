@@ -39,9 +39,9 @@
 
 规则：同算法直译，`int` = i64，计数用 `while`，stdout checksum 必须逐字节一致。不是各语言最快写法（Go 不用 `for range` 特化、C 不做手写 SIMD）。跨语言测量方法见[根 README](../../README.md#测量口径)：整程序 wall、best+median、峰值 RSS + CPU(user+sys)、可选 `--discard-first`。结果仅覆盖这些负载与所测环境。
 
-- Xu 运行时对拍：`scripts/bench_runtime.sh` / `make runtime`（同一 hosted 产品编译器分别以 O0 与默认优化编译，核对输出；耗时取 best-of，默认 5 次，可用 `--iters=N` 调整）。
-- 优化档：`scripts/bench_opt_full.sh` / `make opt-full`（运行 wall+RSS+CPU+体积+曲线 + 编译 wall/RSS + Xu `--timings` 分相；写 `reports/bench_opt_levels.latest.txt`）。只看上次结果：`./scripts/bench_opt_full.sh --digest`。门禁 `make opt-levels ARGS="--check"` / `scripts/bench_opt_levels.sh --check`：选定负载的 Xu O0–O3 + `--no-regcache` + `-O1 --ra=2` + `-O2 --ra=1`，stdout 必须一致；超时阈值为默认档耗时的 5×（至少 1 秒）；短负载墙钟相对 CPU 多出 >40ms 失败；O2/O3 不得慢于 O1（5% 且 0.5ms）。`--quick` 是 5 负载子集。
-- 优化阶段二分：`python3 scripts/opt_stage_bisect.py --bench=iface_sum --opt=2`（hosted 产品编译器的 `--dump-opt-stages` / `--opt-stop`）。
+- Xu 运行时对拍：`scripts/bench_runtime.sh` / `make runtime`（同一 hosted 产品编译器分别以 `--no-opt` 与默认优化编译，核对输出；耗时取 best-of，默认 5 次，可用 `--iters=N` 调整）。
+- 优化模式：`scripts/bench_opt_full.sh` / `make opt-full` 对比默认优化和 `--no-opt` 的运行、资源与编译时间。用 `--digest` 查看上次结果。门禁 `make opt-levels ARGS="--check"` 检查 stdout、超时和墙钟与 CPU 时间。
+- 优化诊断：`python3 scripts/opt_stage_bisect.py --bench=iface_sum` 比较默认优化与 `--no-opt`，支持优化阶段转储的编译器可进一步定位。
 - 跨语言：`make crosslang`（通过 hosted seed resolver 选择产品编译器，再由 hermetic wrapper 编译 Xu 负载；此入口不执行自举固定点检查）
   - 直接运行脚本时也使用同一 resolver；默认从 Xu 仓库的 `bin/xu` 或 hosted snapshot 选择，`--xu=PATH` 可指定另一个 hosted 产品编译器
   - `--quick` 省去对照语言的调试档和编译时间；Xu 使用默认优化，Clang（主机缺失时 GCC）、rustc 的 O1/O2/O3 仍全部参与（安静机器；热机会偏慢）

@@ -422,7 +422,7 @@ def main():
     ap.add_argument(
         "--quick",
         action="store_true",
-        help="skip debug-peer builds and compile-time section; keep Xu/C/Rust O1–O3",
+        help="skip debug-peer builds and compile-time section; keep default Xu plus C and Rust O1–O3",
     )
     ap.add_argument(
         "--full",
@@ -873,7 +873,7 @@ def main():
     log("")
     log(
         "## binary size summary  "
-        "(Xu / C / Rust O1–O3 plus Go / Swift, KiB, not stripped)"
+        "(default Xu, C and Rust O1–O3, Go and Swift, KiB, not stripped)"
     )
     hdr = f"{'bench':<16}" + "".join(f"{p:>12}" for p in SIZE_PEERS)
     log(hdr)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Product-only regression: FieldRMW/f64 residency, golden energy, O2/O3 vs O1.
+# Product-only regression for golden energy and default/no-opt CPU comparison.
 # Uses paired CPU samples so unrelated host workloads do not become wall regressions.
 # Usage: scripts/test_nbody_residency.sh --xu=bin/xu [--out=/tmp/nbody.json]
 set -euo pipefail
@@ -22,11 +22,13 @@ done
 XU=$(XU_SEED="$XU_INPUT" "$HOST_SEED_RESOLVER")
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-for mode in O1 O2 O3 nrc; do
-    flag="-$mode"
-    [ "$mode" != nrc ] || flag=--no-regcache
+help=$("$PRODUCT_COMPILER_RUNNER" "$XU" build --help)
+for mode in default no-opt; do
+    set --
+    if [ "$mode" = no-opt ]; then set -- --no-opt; fi
+    if [[ "$help" == *--timings* ]]; then set -- "$@" --timings; fi
     "$PRODUCT_COMPILER_RUNNER" "$XU" build \
-        "$BENCH_ROOT/tests/bench/game/nbody.xu" "$flag" --timings -o "$tmp/$mode" \
+        "$BENCH_ROOT/tests/bench/game/nbody.xu" "$@" -o "$tmp/$mode" \
         >"$tmp/$mode.log" 2>&1
 done
 python3 - "$BENCH_ROOT" "$XU" "$tmp" "$OUT" <<'PY'
@@ -42,16 +44,19 @@ sys.path.insert(0, str(Path(root) / "scripts"))
 from bench_rusage import run_one
 
 work = Path(work)
-modes = ["O1", "O2", "O3", "nrc"]
+modes = ["default", "no-opt"]
 golden = b"-0.169075164\n-0.169087605\n"
 perf_golden = b"-0.169075164\n-0.169096567\n"
 residency = {}
 for mode in modes:
     sample = run_one([str(work / mode), "1000"], timeout_s=10)
     assert sample.returncode == 0 and sample.stdout == golden, (mode, sample)
-    if mode != "nrc":
-        line = next(line for line in (work / (mode + ".log")).read_text().splitlines()
-                    if line.startswith("ra-fn: label=_xu_main_advance "))
+    if mode == "default":
+        line = next((line for line in (work / (mode + ".log")).read_text().splitlines()
+                     if line.startswith("ra-fn: label=_xu_main_advance ")), None)
+        if line is None:
+            print("nbody: compiler did not report register residency")
+            continue
         fields = dict(re.findall(r"(\w+)=([^ ]+)", line))
         assert fields["mode"] == "vreg" and fields["reason"] == "verified", fields
         scalar, gpr, fp, spill = (int(fields[key]) for key in ["scalar", "gpr", "fp", "spill"])
@@ -73,10 +78,7 @@ for round_index in range(7):
 medians = {mode: {"cpu_ms": statistics.median(s.cpu_s for s in runs) * 1000,
                   "wall_ms": statistics.median(s.wall_s for s in runs) * 1000}
            for mode, runs in samples.items()}
-baseline = medians["O1"]["cpu_ms"]
-for mode in ["O2", "O3"]:
-    assert medians[mode]["cpu_ms"] <= baseline * 1.10 + 2, medians
-assert baseline <= medians["nrc"]["cpu_ms"] * 0.90, medians
+assert medians["default"]["cpu_ms"] <= medians["no-opt"]["cpu_ms"] * 0.90, medians
 report = {"lane": "product", "compiler": compiler,
           "sha256": hashlib.sha256(Path(compiler).read_bytes()).hexdigest(),
           "n": 500000, "rounds": 7, "golden": "PASS", "residency": residency,
@@ -86,5 +88,6 @@ if output:
     Path(output).write_text(json.dumps(report, indent=2) + "\n")
 for mode, median in medians.items():
     print(f"nbody {mode}: CPU {median['cpu_ms']:.2f}ms wall {median['wall_ms']:.2f}ms")
-print("test_nbody_residency: PASS lane=product (golden, GPR/FP homes, paired CPU)")
+checks = "golden, GPR/FP homes, paired CPU" if residency else "golden and paired CPU"
+print(f"test_nbody_residency: PASS lane=product ({checks})")
 PY

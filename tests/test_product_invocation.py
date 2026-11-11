@@ -29,6 +29,16 @@ def test_unix_keeps_direct_wrapper_execution(monkeypatch):
     assert command == ["wrapper.sh", "xu", "build"]
 
 
+def test_benchmark_uses_default_and_explicit_no_opt(monkeypatch):
+    import bench_opt_levels as levels
+
+    monkeypatch.setattr(product_compiler.sys, "platform", "linux")
+    default = levels.xu_compile_argv(Path("xu"), Path("main.xu"), 1, Path("main"))
+    no_opt = levels.xu_compile_argv(Path("xu"), Path("main.xu"), 0, Path("main"))
+    assert default[-5:] == ["xu", "build", "main.xu", "-o", "main"]
+    assert no_opt[-6:] == ["xu", "build", "main.xu", "--no-opt", "-o", "main"]
+
+
 def test_real_wrapper_launch_preserves_unicode_arguments_and_failure(tmp_path):
     if sys.platform != "win32" and not shutil.which("sh"):
         pytest.skip("POSIX shell unavailable")
