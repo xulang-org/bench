@@ -54,8 +54,8 @@ RSS 表头标明实际采样协议。编译器提供 `--timings` 时，报告显
 `http_concurrent` 使用 16 个 worker，各执行 200 次自环回 HTTP 请求。
 每次请求建立新 TCP 连接，校验响应正文和固定校验和；Xu、Go、Rust 提供对照实现。
 Go 使用 `net/http`，Rust 使用标准库线程与最小 HTTP 服务，结果包含连接、调度和协议开销。
-Xu 0.12.4 的六平台横测包含该负载及其 Go、Rust 对照，完整结果共 72 项负载。
-[Actions 实测记录](https://github.com/xulang-org/bench/actions/runs/43736137952)
+Xu 0.13.1 的六平台横测包含该负载及其 Go、Rust 对照，完整结果共 72 项负载。
+[Actions 实测记录](https://github.com/xulang-org/bench/actions/runs/44875498918)
 Windows 的临时 TCP 端口会被 `TIME_WAIT` 保留。每次启动该负载前，工具读取实际 IPv4
 动态端口范围与 TCP 表，等待足够容纳 3200 次新连接及 1024 个余量；各语言使用同一准入
 策略。等待最多 300 秒并单独记录，不计入目标 wall/CPU/RSS，也不修改系统设置。完整
