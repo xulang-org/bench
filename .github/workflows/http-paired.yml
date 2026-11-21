@@ -1,4 +1,4 @@
-name: HTTP short-connection client phases
+name: HTTP poll readiness and resume latency
 on:
   push:
     branches: [codex/http-short-connection-ab-20261121]
@@ -26,7 +26,7 @@ jobs:
         with: {python-version: '3.12'}
       - uses: actions/setup-go@v5
         with: {go-version: 'stable', cache: false}
-      - name: Build the dev compiler and client probes
+      - name: Build isolated runtime counters and client
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET: ${{ matrix.target }}
@@ -36,20 +36,19 @@ jobs:
         run: |
           set -eu
           mkdir out
-          python3 bench/scripts/short_connection_phases.py sources
           cd dev
           python3 scripts/restore_product_seed.py --target "$TARGET" --destination bin/xu
           scripts/build_hosted_chain.sh --candidate-only bin/xu "$GITHUB_WORKSPACE/out/compiler-dev"
-          scripts/run_product_compiler.sh "$GITHUB_WORKSPACE/out/compiler-dev" build "$GITHUB_WORKSPACE/out/xu-phases.xu" -o "$GITHUB_WORKSPACE/out/xu-phases"
           cd ..
+          python3 bench/scripts/http_poll_diag.py configure
+          dev/scripts/run_product_compiler.sh "$GITHUB_WORKSPACE/out/compiler-dev" build "$GITHUB_WORKSPACE/out/diagnostic.xu" -o "$GITHUB_WORKSPACE/out/diagnostic"
           go build -o out/go-peer out/peer.go
-          go build -o out/go-phases out/go-phases.go
-      - name: Measure Xu and Go client phases against the same Go service
-        run: python3 -u bench/scripts/short_connection_phases.py measure
+      - name: Measure readiness outside benchmark timing
+        run: python3 -u bench/scripts/http_poll_diag.py diagnose
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: http-phases-${{ matrix.target }}
+          name: poll-diagnostic-${{ matrix.target }}
           path: |
             out/*.jsonl
-            out/*.provenance
+            out/tcpdump.log
