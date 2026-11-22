@@ -1,4 +1,4 @@
-name: HTTP poll readiness and resume latency
+name: HTTP short-connection paired measurements
 on:
   push:
     branches: [codex/http-short-connection-ab-20261121]
@@ -20,13 +20,18 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: xulang-org/xu
-          ref: bcd7d3e62f075bd8eb07391e78024fe6bd7fbf60
+          ref: 1597f029c1fae39c42a710b0182bcf8ab80a6bbf
+          path: base
+      - uses: actions/checkout@v6
+        with:
+          repository: xulang-org/xu
+          ref: codex/darwin-poll-waiters
           path: dev
       - uses: actions/setup-python@v7
         with: {python-version: '3.12'}
       - uses: actions/setup-go@v5
         with: {go-version: 'stable', cache: false}
-      - name: Build isolated runtime counters and client
+      - name: Prepare both compilers and workloads
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET: ${{ matrix.target }}
@@ -36,19 +41,30 @@ jobs:
         run: |
           set -eu
           mkdir out
-          cd dev
+          sw_vers
+          uname -m
+          go version
+          python3 bench/scripts/paired_http_probe.py sources
+          cd base
           python3 scripts/restore_product_seed.py --target "$TARGET" --destination bin/xu
-          scripts/build_hosted_chain.sh --candidate-only bin/xu "$GITHUB_WORKSPACE/out/compiler-dev"
           cd ..
-          python3 bench/scripts/http_poll_diag.py configure
-          dev/scripts/run_product_compiler.sh "$GITHUB_WORKSPACE/out/compiler-dev" build "$GITHUB_WORKSPACE/out/diagnostic.xu" -o "$GITHUB_WORKSPACE/out/diagnostic"
+          for tree in base dev; do
+            (cd "$tree"
+             scripts/build_hosted_chain.sh --candidate-only "$GITHUB_WORKSPACE/base/bin/xu" "$GITHUB_WORKSPACE/out/compiler-$tree"
+             for variant in original server client; do
+               source="$GITHUB_WORKSPACE/out/$variant.xu"
+               if test "$variant" = original; then source="$GITHUB_WORKSPACE/bench/tests/bench/http_concurrent.xu"; fi
+               scripts/run_product_compiler.sh "$GITHUB_WORKSPACE/out/compiler-$tree" build "$source" -o "$GITHUB_WORKSPACE/out/$tree-$variant"
+             done)
+          done
+          go build -o out/go-original bench/tests/bench/cross/http_concurrent.go
           go build -o out/go-peer out/peer.go
-      - name: Measure readiness outside benchmark timing
-        run: python3 -u bench/scripts/http_poll_diag.py diagnose
+      - name: Compare whole programs and independent client and server
+        run: python3 -u bench/scripts/paired_http_probe.py measure
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: poll-diagnostic-${{ matrix.target }}
+          name: http-paired-${{ matrix.target }}
           path: |
             out/*.jsonl
-            out/tcpdump.log
+            out/*.provenance
