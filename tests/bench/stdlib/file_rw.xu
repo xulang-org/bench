@@ -14,7 +14,7 @@ fn checksum(s string) int {
 }
 
 fn main() int {
-    dir := os.mkdir_temp("", "xu-stdlib-rw-") or (err) {
+    dir := os.mkdir_temp("", "xu-stdlib-rw-") >>> (err) {
         println("m")
         << 1
     }
@@ -30,7 +30,7 @@ fn main() int {
     $i := 0
     $total := 0
     while i < 32 {
-        os.write(file, payload) or (err) {
+        os.write(file, payload) >>> (err) {
             println("w")
             << 1
         }
@@ -38,7 +38,7 @@ fn main() int {
         i += 1
     }
     while i < 256 {
-        os.write(file, payload) or (err) {
+        os.write(file, payload) >>> (err) {
             println("w")
             << 1
         }
@@ -47,7 +47,7 @@ fn main() int {
 
     i = 0
     while i < 256 {
-        data := os.read(file) or (err) {
+        data := os.read(file) >>> (err) {
             println("r")
             << 1
         }
@@ -55,27 +55,27 @@ fn main() int {
         i += 1
     }
 
-    $f := os.create(file2_create) or (err) {
+    $f := os.create(file2_create) >>> (err) {
         println("c")
         << 1
     }
     i = 0
     while i < 128 {
-        n := f.write(payload) or (err) {
+        n := f.write(payload) >>> (err) {
             println("f")
             << 1
         }
         total += n
         i += 1
     }
-    f.close() or (err) {
+    f.close() >>> (err) {
         println("x")
         << 1
     }
 
     i = 0
     while i < 16 {
-        got := os.read(file2) or (err) {
+        got := os.read(file2) >>> (err) {
             println("q")
             << 1
         }

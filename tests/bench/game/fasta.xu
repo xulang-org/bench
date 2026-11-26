@@ -51,7 +51,7 @@ fn flush(o $&Out) {
     if o.buf.len == 0 {
         <<
     }
-    os_fd_write(1, o.buf) or (err) {
+    os_fd_write(1, o.buf) >>> (err) {
         <<< 1
     }
     o.buf = ""

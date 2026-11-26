@@ -11,7 +11,7 @@ fn main() int {
     while i < 25000 {
         enc := hex.encode_to_string(payload)
         enc_len := enc.len
-        dec := hex.decode_string(enc) or (err) { << 1 }
+        dec := hex.decode_string(enc) >>> (err) { << 1 }
         total += enc_len + dec.len
         if i == 0 {
             total += dec[0] + dec[dec.len - 1]

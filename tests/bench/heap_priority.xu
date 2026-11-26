@@ -18,7 +18,7 @@ fn main() int {
     // Phase 2: Pop 100,000 elements
     i = 0
     while i < 100000 {
-        v := h.pop() or (err) { << 1 }
+        v := h.pop() >>> (err) { << 1 }
         checksum = (checksum * 31 + v) % 1000000007
         i += 1
     }
@@ -33,7 +33,7 @@ fn main() int {
 
     // Phase 4: Pop remaining 200,000 elements
     while h.n > 0 {
-        v := h.pop() or (err) { << 1 }
+        v := h.pop() >>> (err) { << 1 }
         checksum = (checksum * 31 + v) % 1000000007
     }
 

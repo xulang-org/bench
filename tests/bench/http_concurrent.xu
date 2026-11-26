@@ -58,16 +58,16 @@ fn content_length_of(head &string) int {
         end += 1
     }
     num := rest[0:end]
-    << strconv.atoi(&num) or (err) { << -1 }
+    << strconv.atoi(&num) >>> (err) { << -1 }
 }
 
 // One request on a fresh connection. The response body length comes from the
 // Content-Length header, so the read loop never depends on EOF ordering.
 fn fetch(addr string, seq int) string {
-    fd := net.dial_ns(addr + "", 5000000000) or (err) { << "" }
+    fd := net.dial_ns(addr + "", 5000000000) >>> (err) { << "" }
     req := "GET /r/" + strconv.itoa(seq) + " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
-    net.conn_write(fd, &req) or (err) {
-        net.conn_close(fd) or (err) { << "" }
+    net.conn_write(fd, &req) >>> (err) {
+        net.conn_close(fd) >>> (err) { << "" }
         << ""
     }
     $buf := ""
@@ -78,7 +78,7 @@ fn fetch(addr string, seq int) string {
     while !done {
         $part := ""
         $ok := true
-        part = net.conn_read(fd, 65536) or (err) { ok = false
+        part = net.conn_read(fd, 65536) >>> (err) { ok = false
             << "" }
         if !ok { <- }
         if part.len == 0 { <- }
@@ -98,7 +98,7 @@ fn fetch(addr string, seq int) string {
             }
         }
     }
-    net.conn_close(fd) or (err) { << body }
+    net.conn_close(fd) >>> (err) { << body }
     << body
 }
 
@@ -126,21 +126,21 @@ fn worker(addr string, base int, out chan int) {
 
 fn seq_of(path &string) int {
     seq_text := strings.trim_prefix(path, "/r/")
-    << strconv.atoi(&seq_text) or (err) { << 0 }
+    << strconv.atoi(&seq_text) >>> (err) { << 0 }
 }
 
 fn handler(c http.Context) {
     path := c.path()
     body := expected_body(seq_of(&path))
-    c.text(200, body) or (err) { << }
+    c.text(200, body) >>> (err) { << }
 }
 
 fn serve(lfd int) {
-    http.serve_listener(lfd, handler) or (err) { << }
+    http.serve_listener(lfd, handler) >>> (err) { << }
 }
 
 fn try_listen(addr string) int {
-    << net.listen(addr) or (err) { << -1 }
+    << net.listen(addr) >>> (err) { << -1 }
 }
 
 fn main() int {

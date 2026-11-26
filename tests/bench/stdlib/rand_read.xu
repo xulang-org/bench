@@ -6,7 +6,7 @@ fn main() int {
     $total := 0
     $i := 0
     while i < 256 {
-        chunk := rand.read(2048) or (err) {
+        chunk := rand.read(2048) >>> (err) {
             println("r")
             << 1
         }

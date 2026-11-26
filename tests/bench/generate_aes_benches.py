@@ -133,7 +133,7 @@ def main():
             end+=1
         code=original[start:end-1]
         # remove both invalid-block guard statements together
-        code=re.sub(r'\n    if src.len != 16 \{\n        >> errors.new\([^\n]+\n    \}', '', code)
+        code=re.sub(r'\n    if src.len != 16 \{\n        >>> errors.new\([^\n]+\n    \}', '', code)
         return code
     names = ['xtime','rotl8','make_sbox','rcon','expand_key','shift_rows','inv_shift_rows','load16','encrypt','decrypt']
     csign = ['int64_t xtime(int64_t a)','int64_t rotl8(int64_t x,int64_t n)','Vec make_sbox(void)',
@@ -234,7 +234,7 @@ fn main() int {{
     $checksum:=0
     for i in 0:{N_KEYS} {{
         key[0]=i&255
-        c:=aes.new_cipher(&key) or (err) {{<<1}}
+        c:=aes.new_cipher(&key) >>> (err) {{<<1}}
         checksum=checksum+c.rk[c.rk.len-16+(i&15)]
     }}
     println(checksum)
@@ -252,10 +252,10 @@ fn main() int {{
 #crypto/aes
 #encoding/hex
 fn main() int {{
-    key:=hex.decode_string("{key.hex()}") or (err) {{<<1}}
-    c:=aes.new_cipher(&key) or (err) {{<<1}}
-    $block:=hex.decode_string("{PT.hex()}") or (err) {{<<1}}
-    for i in 0:{N_BLOCKS} {{block=c.{tag}(&block) or (err) {{<<1}}}}
+    key:=hex.decode_string("{key.hex()}") >>> (err) {{<<1}}
+    c:=aes.new_cipher(&key) >>> (err) {{<<1}}
+    $block:=hex.decode_string("{PT.hex()}") >>> (err) {{<<1}}
+    for i in 0:{N_BLOCKS} {{block=c.{tag}(&block) >>> (err) {{<<1}}}}
     println(hex.encode_to_string(block))
     <<0
 }}

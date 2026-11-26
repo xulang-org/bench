@@ -9,9 +9,9 @@ fn main() int {
     $total := 0
     $i := 0
     while i < 2500 {
-        enc := lzw.encode(&payload, lzw.lsb, 8) or (err) { << 1 }
+        enc := lzw.encode(&payload, lzw.lsb, 8) >>> (err) { << 1 }
         enc_len := enc.len
-        dec := lzw.decode(&enc, lzw.lsb, 8) or (err) { << 1 }
+        dec := lzw.decode(&enc, lzw.lsb, 8) >>> (err) { << 1 }
         total += enc_len + dec.len
         if i == 0 {
             total += dec[0] + dec[dec.len - 1]

@@ -16,14 +16,14 @@ fn main() int {
     $sum := 0
     $got := ""
     while i < 32 {
-        wrote := write_file("roundtrip.bin", s) or (err) {
+        wrote := write_file("roundtrip.bin", s) >>> (err) {
             println("write failed")
             << 1
         }
         if wrote != want {
             << 1
         }
-        got = read_file("roundtrip.bin") or (err) {
+        got = read_file("roundtrip.bin") >>> (err) {
             println("read failed")
             << 1
         }

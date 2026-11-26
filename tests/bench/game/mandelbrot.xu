@@ -74,7 +74,7 @@ fn write_pixels(pixels &[]u8) {
             chunk.push_byte(int(pixels[off]))
             off += 1
         }
-        os_fd_write(1, chunk) or (err) {
+        os_fd_write(1, chunk) >>> (err) {
             <<< 1
         }
     }
@@ -90,7 +90,7 @@ fn main() int {
     }
     render($&pixels, w)
     header := "P4\n" + str(w) + " " + str(w) + "\n"
-    os_fd_write(1, header) or (err) { << 1 }
+    os_fd_write(1, header) >>> (err) { << 1 }
     write_pixels(&pixels)
     << 0
 }

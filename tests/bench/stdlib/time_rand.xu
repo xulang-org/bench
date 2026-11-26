@@ -3,7 +3,7 @@
 #time
 
 fn parse_sample(d string) int {
-    << time.parse_duration(&d) or (err) { << 0 }
+    << time.parse_duration(&d) >>> (err) { << 0 }
 }
 
 fn main() int {

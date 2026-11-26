@@ -11,7 +11,7 @@ fn main() int {
     while i < 15000 {
         enc := b64.encode_to_string(payload)
         enc_len := enc.len
-        dec := b64.decode_string(enc) or (err) { << 1 }
+        dec := b64.decode_string(enc) >>> (err) { << 1 }
         total += enc_len + dec.len
         if i == 0 {
             total += dec[0] + dec[dec.len - 1]

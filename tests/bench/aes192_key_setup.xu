@@ -6,7 +6,7 @@ fn main() int {
     $checksum:=0
     for i in 0:10000 {
         key[0]=i&255
-        c:=aes.new_cipher(&key) or (err) {<<1}
+        c:=aes.new_cipher(&key) >>> (err) {<<1}
         checksum=checksum+c.rk[c.rk.len-16+(i&15)]
     }
     println(checksum)
