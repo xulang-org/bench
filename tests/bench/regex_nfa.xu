@@ -1,0 +1,429 @@
+@main
+
+struct NfaPool {
+    pub st_kind []int
+    pub st_out1 []int
+    pub st_out2 []int
+    pub p_st []int
+    pub p_wh []int
+    pub p_next []int
+    pub start_st []int
+    pub match_st []int
+}
+
+fn prec(op int) int {
+    if op == -3 {
+        << 1
+    }
+    if op == -2 {
+        << 2
+    }
+    if op == -4 || op == -5 || op == -6 {
+        << 3
+    }
+    << 0
+}
+
+fn add_st(nfa $&NfaPool, k int, o1 int, o2 int) int {
+    idx := nfa.st_kind.len
+    nfa.st_kind.push(k)
+    nfa.st_out1.push(o1)
+    nfa.st_out2.push(o2)
+    << idx
+}
+
+fn new_patch(nfa $&NfaPool, si int, wh int) int {
+    idx := nfa.p_st.len
+    nfa.p_st.push(si)
+    nfa.p_wh.push(wh)
+    nfa.p_next.push(-1)
+    << idx
+}
+
+fn append_patch(nfa $&NfaPool, h1 int, t1 int, h2 int) int {
+    if h1 == -1 {
+        << h2
+    }
+    if h2 == -1 {
+        << h1
+    }
+    nfa.p_next[t1] = h2
+    << h1
+}
+
+fn apply_patch(nfa $&NfaPool, head int, target int) {
+    $cur := head
+    while cur != -1 {
+        if nfa.p_wh[cur] == 1 {
+            nfa.st_out1[nfa.p_st[cur]] = target
+        } else {
+            nfa.st_out2[nfa.p_st[cur]] = target
+        }
+        cur = nfa.p_next[cur]
+    }
+}
+
+fn compile_pattern(nfa $&NfaPool, pat string) {
+    $toks := []int{}
+    $prev_atom := false
+    $i := 0
+    while i < pat.len {
+        c := pat[i] & 255
+        if c == 40 {
+            if prev_atom {
+                toks.push(-2)
+            }
+            toks.push(-10)
+            prev_atom = false
+        } else if c == 41 {
+            toks.push(-11)
+            prev_atom = true
+        } else if c == 124 {
+            toks.push(-3)
+            prev_atom = false
+        } else if c == 42 {
+            toks.push(-4)
+            prev_atom = true
+        } else if c == 43 {
+            toks.push(-5)
+            prev_atom = true
+        } else if c == 63 {
+            toks.push(-6)
+            prev_atom = true
+        } else {
+            if prev_atom {
+                toks.push(-2)
+            }
+            if c == 46 {
+                toks.push(-1)
+            } else {
+                toks.push(c)
+            }
+            prev_atom = true
+        }
+        i += 1
+    }
+
+    $post := []int{}
+    $ops := []int{}
+    $k := 0
+    while k < 256 {
+        ops.push(0)
+        k += 1
+    }
+    $ops_len := 0
+    i = 0
+    while i < toks.len {
+        t := toks[i]
+        if t >= 0 || t == -1 {
+            post.push(t)
+        } else if t == -10 {
+            ops[ops_len] = t
+            ops_len += 1
+        } else if t == -11 {
+            while ops_len > 0 && ops[ops_len - 1] != -10 {
+                ops_len -= 1
+                post.push(ops[ops_len])
+            }
+            if ops_len > 0 {
+                ops_len -= 1
+            }
+        } else {
+            pt := prec(t)
+            while ops_len > 0 && ops[ops_len - 1] != -10 && prec(ops[ops_len - 1]) >= pt {
+                ops_len -= 1
+                post.push(ops[ops_len])
+            }
+            ops[ops_len] = t
+            ops_len += 1
+        }
+        i += 1
+    }
+    while ops_len > 0 {
+        ops_len -= 1
+        post.push(ops[ops_len])
+    }
+
+    $fs := []int{}
+    $fh := []int{}
+    $ft := []int{}
+    k = 0
+    while k < 256 {
+        fs.push(0)
+        fh.push(0)
+        ft.push(0)
+        k += 1
+    }
+    $fsp := 0
+    i = 0
+    while i < post.len {
+        t := post[i]
+        if t >= 0 || t == -1 {
+            s := add_st(nfa, t, -1, -1)
+            p := new_patch(nfa, s, 1)
+            fs[fsp] = s
+            fh[fsp] = p
+            ft[fsp] = p
+            fsp += 1
+        } else if t == -2 {
+            fsp -= 1
+            s2 := fs[fsp]
+            h2 := fh[fsp]
+            t2 := ft[fsp]
+            fsp -= 1
+            s1 := fs[fsp]
+            h1 := fh[fsp]
+            apply_patch(nfa, h1, s2)
+            fs[fsp] = s1
+            fh[fsp] = h2
+            ft[fsp] = t2
+            fsp += 1
+        } else if t == -3 {
+            fsp -= 1
+            s2 := fs[fsp]
+            h2 := fh[fsp]
+            t2 := ft[fsp]
+            fsp -= 1
+            s1 := fs[fsp]
+            h1 := fh[fsp]
+            t1 := ft[fsp]
+            s := add_st(nfa, -2, s1, s2)
+            hn := append_patch(nfa, h1, t1, h2)
+            fs[fsp] = s
+            fh[fsp] = hn
+            ft[fsp] = t2
+            fsp += 1
+        } else if t == -6 {
+            fsp -= 1
+            s1 := fs[fsp]
+            h1 := fh[fsp]
+            t1 := ft[fsp]
+            s := add_st(nfa, -2, s1, -1)
+            p := new_patch(nfa, s, 2)
+            hn := append_patch(nfa, h1, t1, p)
+            fs[fsp] = s
+            fh[fsp] = hn
+            ft[fsp] = p
+            fsp += 1
+        } else if t == -4 {
+            fsp -= 1
+            s1 := fs[fsp]
+            h1 := fh[fsp]
+            s := add_st(nfa, -2, s1, -1)
+            apply_patch(nfa, h1, s)
+            p := new_patch(nfa, s, 2)
+            fs[fsp] = s
+            fh[fsp] = p
+            ft[fsp] = p
+            fsp += 1
+        } else if t == -5 {
+            fsp -= 1
+            s1 := fs[fsp]
+            h1 := fh[fsp]
+            s := add_st(nfa, -2, s1, -1)
+            apply_patch(nfa, h1, s)
+            p := new_patch(nfa, s, 2)
+            fs[fsp] = s1
+            fh[fsp] = p
+            ft[fsp] = p
+            fsp += 1
+        }
+        i += 1
+    }
+    m := add_st(nfa, -3, -1, -1)
+    apply_patch(nfa, fh[fsp - 1], m)
+    nfa.start_st.push(fs[fsp - 1])
+    nfa.match_st.push(m)
+}
+
+fn add_state(nfa &NfaPool, vis $&[]int, lst $&[]int, lst_len int, stk $&[]int, s int, gen int) int {
+    $out_len := lst_len
+    $sp := 0
+    stk[sp] = s
+    sp += 1
+    while sp > 0 {
+        sp -= 1
+        u := stk[sp]
+        if u < 0 || vis[u] == gen {
+            ->
+        }
+        vis[u] = gen
+        if nfa.st_kind[u] == -2 {
+            stk[sp] = nfa.st_out2[u]
+            sp += 1
+            stk[sp] = nfa.st_out1[u]
+            sp += 1
+        } else {
+            lst[out_len] = u
+            out_len += 1
+        }
+    }
+    << out_len
+}
+
+fn nfa_search(
+    nfa &NfaPool,
+    start int,
+    match_st int,
+    text &[]int,
+    tlen int,
+    vis $&[]int,
+    gen_box $&[]int,
+    cur $&[]int,
+    nxt $&[]int,
+    stk $&[]int
+) bool {
+    $gen := gen_box[0] + 1
+    $cur_len := add_state(nfa, vis, cur, 0, stk, start, gen)
+    if vis[match_st] == gen {
+        gen_box[0] = gen
+        << true
+    }
+    $i := 0
+    while i < tlen {
+        c := text[i]
+        gen += 1
+        $nxt_len := 0
+        $j := 0
+        while j < cur_len {
+            u := cur[j]
+            k := nfa.st_kind[u]
+            if k == c || k == -1 {
+                nxt_len = add_state(nfa, vis, nxt, nxt_len, stk, nfa.st_out1[u], gen)
+            }
+            j += 1
+        }
+        nxt_len = add_state(nfa, vis, nxt, nxt_len, stk, start, gen)
+        if vis[match_st] == gen {
+            gen_box[0] = gen
+            << true
+        }
+        $k := 0
+        while k < nxt_len {
+            cur[k] = nxt[k]
+            k += 1
+        }
+        cur_len = nxt_len
+        i += 1
+    }
+    gen_box[0] = gen
+    << false
+}
+
+fn main() int {
+    $nfa := NfaPool{
+        st_kind: []int{},
+        st_out1: []int{},
+        st_out2: []int{},
+        p_st: []int{},
+        p_wh: []int{},
+        p_next: []int{},
+        start_st: []int{},
+        match_st: []int{}
+    }
+    $patterns := []string{}
+    patterns.push("ab+c")
+    patterns.push("(a|ab)*cd")
+    patterns.push("x..y*z")
+    patterns.push("(foo|bar)+baz")
+    patterns.push("a(b|c)+d?")
+    patterns.push("k(m|n)*p+q")
+
+    $pi := 0
+    while pi < patterns.len {
+        compile_pattern($&nfa, patterns[pi])
+        pi += 1
+    }
+
+    $tokens := []string{}
+    tokens.push("ab")
+    tokens.push("bc")
+    tokens.push("cd")
+    tokens.push("foo")
+    tokens.push("bar")
+    tokens.push("baz")
+    tokens.push("xyz")
+    tokens.push("x12y")
+    tokens.push("yz")
+    tokens.push("kmpq")
+    tokens.push("knppq")
+    tokens.push("abc")
+    tokens.push("abbc")
+    tokens.push("abd")
+    tokens.push("acd")
+    tokens.push("a")
+    tokens.push("b")
+    tokens.push("c")
+    tokens.push("d")
+    tokens.push("x")
+    tokens.push("y")
+    tokens.push("z")
+    tokens.push("k")
+    tokens.push("m")
+    tokens.push("n")
+    tokens.push("p")
+    tokens.push("q")
+    tokens.push("0")
+    tokens.push("_")
+    tokens.push("-")
+
+    n_st := nfa.st_kind.len
+    $vis := []int{}
+    $cur := []int{}
+    $nxt := []int{}
+    $stk := []int{}
+    $i := 0
+    while i < n_st {
+        vis.push(0)
+        cur.push(0)
+        nxt.push(0)
+        stk.push(0)
+        stk.push(0)
+        i += 1
+    }
+    $gen_box := []int{}
+    gen_box.push(0)
+
+    $line := []int{}
+    i = 0
+    while i < 256 {
+        line.push(0)
+        i += 1
+    }
+
+    $rng := 2463534242
+    $matches := 0
+    $weighted := 0
+    $li := 0
+    while li < 6000 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        n_tok := 8 + (rng % 10)
+        $tlen := 0
+        $ti := 0
+        while ti < n_tok {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            tok := tokens[rng % 30]
+            $ci := 0
+            while ci < tok.len {
+                line[tlen] = tok[ci] & 255
+                tlen += 1
+                ci += 1
+            }
+            ti += 1
+        }
+        pi = 0
+        while pi < 6 {
+            s_st := nfa.start_st[pi]
+            m_st := nfa.match_st[pi]
+            if nfa_search(&nfa, s_st, m_st, &line, tlen, $&vis, $&gen_box, $&cur, $&nxt, $&stk) {
+                matches += 1
+                weighted = (weighted + (li + 1) * (pi + 1)) % 1000000007
+            }
+            pi += 1
+        }
+        li += 1
+    }
+    println(matches)
+    println(weighted)
+    << 0
+}

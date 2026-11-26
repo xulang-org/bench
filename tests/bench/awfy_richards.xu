@@ -1,0 +1,298 @@
+@main
+
+struct RichardsState {
+    pub pkt_link []int
+    pub pkt_id []int
+    pub pkt_kind []int
+    pub pkt_datum []int
+    pub pkt_data []int
+    pub pkt_n int
+    pub t_link []int
+    pub t_pri []int
+    pub t_inp []int
+    pub t_pkt_pend []int
+    pub t_waiting []int
+    pub t_holding []int
+    pub t_v1 []int
+    pub t_v2 []int
+    pub task_list int
+    pub queue_count int
+    pub hold_count int
+    pub cur int
+    pub cur_id int
+}
+
+fn new_richards_state() RichardsState {
+    $pkt_link := []int{}
+    $pkt_id := []int{}
+    $pkt_kind := []int{}
+    $pkt_datum := []int{}
+    $i := 0
+    while i < 8 {
+        pkt_link.push(-1)
+        pkt_id.push(0)
+        pkt_kind.push(0)
+        pkt_datum.push(0)
+        i += 1
+    }
+    $pkt_data := []int{}
+    i = 0
+    while i < 32 {
+        pkt_data.push(0)
+        i += 1
+    }
+    $t_link := []int{}
+    $t_pri := []int{}
+    $t_inp := []int{}
+    $t_pkt_pend := []int{}
+    $t_waiting := []int{}
+    $t_holding := []int{}
+    $t_v1 := []int{}
+    $t_v2 := []int{}
+    i = 0
+    while i < 6 {
+        t_link.push(-1)
+        t_pri.push(0)
+        t_inp.push(-1)
+        t_pkt_pend.push(0)
+        t_waiting.push(0)
+        t_holding.push(0)
+        t_v1.push(0)
+        t_v2.push(0)
+        i += 1
+    }
+    << RichardsState{
+        pkt_link: pkt_link,
+        pkt_id: pkt_id,
+        pkt_kind: pkt_kind,
+        pkt_datum: pkt_datum,
+        pkt_data: pkt_data,
+        pkt_n: 0,
+        t_link: t_link,
+        t_pri: t_pri,
+        t_inp: t_inp,
+        t_pkt_pend: t_pkt_pend,
+        t_waiting: t_waiting,
+        t_holding: t_holding,
+        t_v1: t_v1,
+        t_v2: t_v2,
+        task_list: -1,
+        queue_count: 0,
+        hold_count: 0,
+        cur: -1,
+        cur_id: -1
+    }
+}
+
+fn create_pkt(s $&RichardsState, link int, identity int, kind int) int {
+    idx := s.pkt_n
+    s.pkt_n += 1
+    s.pkt_link[idx] = link
+    s.pkt_id[idx] = identity
+    s.pkt_kind[idx] = kind
+    s.pkt_datum[idx] = 0
+    base := idx * 4
+    s.pkt_data[base] = 0
+    s.pkt_data[base + 1] = 0
+    s.pkt_data[base + 2] = 0
+    s.pkt_data[base + 3] = 0
+    << idx
+}
+
+fn append_pkt(s $&RichardsState, pkt int, head int) int {
+    s.pkt_link[pkt] = -1
+    if head == -1 {
+        << pkt
+    }
+    $cur := head
+    while s.pkt_link[cur] != -1 {
+        cur = s.pkt_link[cur]
+    }
+    s.pkt_link[cur] = pkt
+    << head
+}
+
+fn add_task(s $&RichardsState, tid int, pri int, inp int, pkt_p int, wait_f int, hold_f int, v1 int, v2 int) {
+    s.t_link[tid] = s.task_list
+    s.t_pri[tid] = pri
+    s.t_inp[tid] = inp
+    s.t_pkt_pend[tid] = pkt_p
+    s.t_waiting[tid] = wait_f
+    s.t_holding[tid] = hold_f
+    s.t_v1[tid] = v1
+    s.t_v2[tid] = v2
+    s.task_list = tid
+}
+
+fn queue_pkt(s $&RichardsState, p int) int {
+    dest := s.pkt_id[p]
+    if dest < 0 || dest >= 6 {
+        << -1
+    }
+    s.queue_count += 1
+    s.pkt_link[p] = -1
+    s.pkt_id[p] = s.cur_id
+    if s.t_inp[dest] == -1 {
+        s.t_inp[dest] = p
+        s.t_pkt_pend[dest] = 1
+        if s.t_pri[dest] > s.t_pri[s.cur] {
+            << dest
+        }
+    } else {
+        s.t_inp[dest] = append_pkt(s, p, s.t_inp[dest])
+    }
+    << s.cur
+}
+
+fn run_richards_once(s $&RichardsState) {
+    s.pkt_n = 0
+    s.task_list = -1
+    s.queue_count = 0
+    s.hold_count = 0
+    s.cur_id = -1
+
+    add_task(s, 0, 0, -1, 0, 0, 0, 1, 10000)
+
+    $wq := create_pkt(s, -1, 1, 1)
+    wq = create_pkt(s, wq, 1, 1)
+    add_task(s, 1, 1000, wq, 1, 1, 0, 2, 0)
+
+    wq = create_pkt(s, -1, 4, 0)
+    wq = create_pkt(s, wq, 4, 0)
+    wq = create_pkt(s, wq, 4, 0)
+    add_task(s, 2, 2000, wq, 1, 1, 0, -1, -1)
+
+    wq = create_pkt(s, -1, 5, 0)
+    wq = create_pkt(s, wq, 5, 0)
+    wq = create_pkt(s, wq, 5, 0)
+    add_task(s, 3, 3000, wq, 1, 1, 0, -1, -1)
+
+    add_task(s, 4, 4000, -1, 0, 1, 0, -1, 0)
+    add_task(s, 5, 5000, -1, 0, 1, 0, -1, 0)
+
+    s.cur = s.task_list
+    while s.cur != -1 {
+        c := s.cur
+        if s.t_holding[c] != 0 || (s.t_pkt_pend[c] == 0 && s.t_waiting[c] != 0) {
+            s.cur = s.t_link[c]
+            ->
+        }
+        s.cur_id = c
+        $msg := -1
+        if s.t_holding[c] == 0 && s.t_waiting[c] != 0 && s.t_pkt_pend[c] != 0 {
+            msg = s.t_inp[c]
+            s.t_inp[c] = s.pkt_link[msg]
+            if s.t_inp[c] == -1 {
+                s.t_pkt_pend[c] = 0
+            } else {
+                s.t_pkt_pend[c] = 1
+            }
+            s.t_waiting[c] = 0
+            s.t_holding[c] = 0
+        }
+
+        cid := s.cur_id
+        if cid == 0 {
+            s.t_v2[c] -= 1
+            if s.t_v2[c] == 0 {
+                s.hold_count += 1
+                s.t_holding[c] = 1
+                s.cur = s.t_link[c]
+            } else if (s.t_v1[c] & 1) == 0 {
+                s.t_v1[c] = s.t_v1[c] >> 1
+                s.t_holding[4] = 0
+                if s.t_pri[4] > s.t_pri[c] {
+                    s.cur = 4
+                }
+            } else {
+                s.t_v1[c] = (s.t_v1[c] >> 1) ^ 53256
+                s.t_holding[5] = 0
+                if s.t_pri[5] > s.t_pri[c] {
+                    s.cur = 5
+                }
+            }
+        } else if cid == 1 {
+            if msg == -1 {
+                s.t_waiting[c] = 1
+            } else {
+                if s.t_v1[c] == 2 {
+                    s.t_v1[c] = 3
+                } else {
+                    s.t_v1[c] = 2
+                }
+                s.pkt_id[msg] = s.t_v1[c]
+                s.pkt_datum[msg] = 0
+                base := msg * 4
+                $i := 0
+                while i < 4 {
+                    s.t_v2[c] += 1
+                    if s.t_v2[c] > 26 {
+                        s.t_v2[c] = 1
+                    }
+                    s.pkt_data[base + i] = 64 + s.t_v2[c]
+                    i += 1
+                }
+                s.cur = queue_pkt(s, msg)
+            }
+        } else if cid == 2 || cid == 3 {
+            if msg != -1 {
+                if s.pkt_kind[msg] == 1 {
+                    s.t_v1[c] = append_pkt(s, msg, s.t_v1[c])
+                } else {
+                    s.t_v2[c] = append_pkt(s, msg, s.t_v2[c])
+                }
+            }
+            wp := s.t_v1[c]
+            if wp == -1 {
+                s.t_waiting[c] = 1
+            } else {
+                cnt := s.pkt_datum[wp]
+                if cnt >= 4 {
+                    s.t_v1[c] = s.pkt_link[wp]
+                    s.cur = queue_pkt(s, wp)
+                } else {
+                    dp := s.t_v2[c]
+                    if dp == -1 {
+                        s.t_waiting[c] = 1
+                    } else {
+                        s.t_v2[c] = s.pkt_link[dp]
+                        s.pkt_datum[dp] = s.pkt_data[wp * 4 + cnt]
+                        s.pkt_datum[wp] = cnt + 1
+                        s.cur = queue_pkt(s, dp)
+                    }
+                }
+            }
+        } else {
+            if msg == -1 {
+                if s.t_v1[c] == -1 {
+                    s.t_waiting[c] = 1
+                } else {
+                    fp := s.t_v1[c]
+                    s.t_v1[c] = -1
+                    s.cur = queue_pkt(s, fp)
+                }
+            } else {
+                s.t_v1[c] = msg
+                s.hold_count += 1
+                s.t_holding[c] = 1
+                s.cur = s.t_link[c]
+            }
+        }
+    }
+}
+
+fn main() int {
+    $st := new_richards_state()
+    $tot_q := 0
+    $tot_h := 0
+    $r := 0
+    while r < 50 {
+        run_richards_once($&st)
+        tot_q += st.queue_count
+        tot_h += st.hold_count
+        r += 1
+    }
+    println(tot_q)
+    println(tot_h)
+    << 0
+}

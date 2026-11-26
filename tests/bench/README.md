@@ -36,6 +36,29 @@
 | `sroa_vec3` | 256 个 `{x,y,z f64}` × 40000 归约 | AoS 字段 / SROA / FieldRMW | C 结构体数组 |
 | `scan_dep` | 4096 宽 prefix-add × 20000 | 进位依赖、skip-store | 同算法标量链 |
 | `chase_index` | 65536 环 × 20e6 步 | 数据相关下标 / gather | 同算法间接索引 |
+| `avl_tree` | AVL 平衡二叉树（8 万次插入 + 30 万次查找） | `avl_tree.xu` | Go / C / Rust / Swift |
+| `chacha20_stream` | ChaCha20 流密码 3 万块生成 | `chacha20_stream.xu` | Go / C / Rust / Swift |
+| `huffman_coding` | Huffman 建树 + 2 万符号位流编码与 50 轮解码 | `huffman_coding.xu` | Go / C / Rust / Swift |
+| `json_tokenizer` | JSON 词法扫描器（1000 轮） | `json_tokenizer.xu` | Go / C / Rust / Swift |
+| `lzw_codec` | LZW 压缩与解压（LSB 8-bit，2500 轮） | `lzw_codec.xu` | Go / C / Rust / Swift |
+| `plb2_nqueen` | [PLB2](plb2/README.md) 15 皇后位运算迭代回溯 | `plb2_nqueen.xu` | Go / C / Rust / Swift |
+| `plb2_sudoku` | [PLB2](plb2/README.md) `kudoku` 精确覆盖数独求解（10 题 × 20 轮） | `plb2_sudoku.xu` | Go / C / Rust / Swift |
+| `plb2_bedcov` | [PLB2](plb2/README.md) 隐式区间树重叠统计（20 万 × 20 万） | `plb2_bedcov.xu` | Go / C / Rust / Swift |
+| `thread_ring` | 503 节点并发令牌环（10 万次传递） | `thread_ring.xu` | Go / Rust |
+| `skynet` | 10 叉树协程扇出汇总（2 轮 × 1111 任务） | `skynet.xu` | Go |
+| `scimark_montecarlo` | [SciMark2](scimark2/README.md) 蒙特卡洛圆周率采样（500 万次） | `scimark_montecarlo.xu` | Go / C / Rust / Swift |
+| `scimark_sor` | [SciMark2](scimark2/README.md) 100×100 二维超松弛（500 轮） | `scimark_sor.xu` | Go / C / Rust / Swift |
+| `scimark_lu` | [SciMark2](scimark2/README.md) 100×100 部分主元 LU 分解（30 轮） | `scimark_lu.xu` | Go / C / Rust / Swift |
+| `scimark_sparse` | [SciMark2](scimark2/README.md) CSR 稀疏矩阵-向量乘（10000 阶 × 500 轮） | `scimark_sparse.xu` | Go / C / Rust / Swift |
+| `scimark_fft` | [SciMark2](scimark2/README.md) 1024 点 Radix-2 复数 FFT（200 轮） | `scimark_fft.xu` | Go / C / Rust / Swift |
+| `awfy_richards` | [AWFY](awfy/README.md) 6 任务 OS 调度模拟（50 轮） | `awfy_richards.xu` | Go / C / Rust / Swift |
+| `awfy_json_parser` | [AWFY](awfy/README.md) 递归下降完整 JSON AST 解析（400 轮） | `awfy_json_parser.xu` | Go / C / Rust / Swift |
+| `brainfuck_vm` | [进阶](awfy/README.md) Brainfuck 字节码解释器（4 轮 ~2070 万步） | `brainfuck_vm.xu` | Go / C / Rust / Swift |
+| `regex_nfa` | [进阶](awfy/README.md) Thompson NFA 正则构造与匹配（6000 行 × 6 模式） | `regex_nfa.xu` | Go / C / Rust / Swift |
+| `treap_ops` | [进阶](awfy/README.md) 节点池无旋转 Treap（12 万次操作） | `treap_ops.xu` | Go / C / Rust / Swift |
+| `astar_maze` | [进阶](awfy/README.md) 60 张 81×81 迷宫最短路 A* 搜索 | `astar_maze.xu` | Go / C / Rust / Swift |
+| `levenshtein_dp` | [进阶](awfy/README.md) Wagner-Fischer 双行编辑距离（400 对） | `levenshtein_dp.xu` | Go / C / Rust / Swift |
+| `csv_aggregate` | [进阶](awfy/README.md) 10 轮 × 10 万行 CSV 定点哈希聚合 | `csv_aggregate.xu` | Go / C / Rust / Swift |
 
 规则：同算法直译，`int` = i64，计数用 `while`，stdout checksum 必须逐字节一致。不是各语言最快写法（Go 不用 `for range` 特化、C 不做手写 SIMD）。跨语言测量方法见[根 README](../../README.md#测量口径)：整程序 wall、best+median、峰值 RSS + CPU(user+sys)、可选 `--discard-first`。结果仅覆盖这些负载与所测环境。
 

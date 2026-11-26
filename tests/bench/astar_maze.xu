@@ -1,0 +1,250 @@
+@main
+
+struct Heap {
+    pub f []int
+    pub n []int
+    pub len int
+}
+
+fn heap_push(h $&Heap, fval int, node int) {
+    $i := h.len
+    h.f[i] = fval
+    h.n[i] = node
+    h.len += 1
+    while i > 0 {
+        p := (i - 1) / 2
+        if h.f[p] > h.f[i] || (h.f[p] == h.f[i] && h.n[p] > h.n[i]) {
+            tf := h.f[p]
+            h.f[p] = h.f[i]
+            h.f[i] = tf
+            tn := h.n[p]
+            h.n[p] = h.n[i]
+            h.n[i] = tn
+            i = p
+        } else {
+            <-
+        }
+    }
+}
+
+fn heap_pop(h $&Heap) int {
+    top := h.n[0]
+    h.len -= 1
+    sz := h.len
+    if sz > 0 {
+        h.f[0] = h.f[sz]
+        h.n[0] = h.n[sz]
+        $i := 0
+        while true {
+            l := 2 * i + 1
+            if l >= sz {
+                <-
+            }
+            r := l + 1
+            $best := l
+            if r < sz && (h.f[r] < h.f[l] || (h.f[r] == h.f[l] && h.n[r] < h.n[l])) {
+                best = r
+            }
+            if h.f[best] < h.f[i] || (h.f[best] == h.f[i] && h.n[best] < h.n[i]) {
+                tf := h.f[i]
+                h.f[i] = h.f[best]
+                h.f[best] = tf
+                tn := h.n[i]
+                h.n[i] = h.n[best]
+                h.n[best] = tn
+                i = best
+            } else {
+                <-
+            }
+        }
+    }
+    << top
+}
+
+fn main() int {
+    w := 81
+    h := 81
+    n := 6561
+    inf := 1000000000
+    start := 82
+    goal := 79 * 81 + 79
+    gx := 79
+    gy := 79
+
+    $grid := []int{}
+    $g_score := []int{}
+    $closed := []int{}
+    $stk_x := []int{}
+    $stk_y := []int{}
+    $i := 0
+    while i < n {
+        grid.push(1)
+        g_score.push(inf)
+        closed.push(0)
+        stk_x.push(0)
+        stk_y.push(0)
+        i += 1
+    }
+
+    $hf := []int{}
+    $hn := []int{}
+    i = 0
+    while i < 32768 {
+        hf.push(0)
+        hn.push(0)
+        i += 1
+    }
+    $hp := Heap{f: hf, n: hn, len: 0}
+
+    $dx := []int{}
+    dx.push(0)
+    dx.push(0)
+    dx.push(-2)
+    dx.push(2)
+    $dy := []int{}
+    dy.push(-2)
+    dy.push(2)
+    dy.push(0)
+    dy.push(0)
+    $dirs := []int{}
+    dirs.push(0)
+    dirs.push(0)
+    dirs.push(0)
+    dirs.push(0)
+
+    $sum_d := 0
+    $poly_d := 0
+    $m := 0
+    while m < 60 {
+        $rng := 100003 + m * 9973
+        i = 0
+        while i < n {
+            grid[i] = 1
+            g_score[i] = inf
+            closed[i] = 0
+            i += 1
+        }
+        grid[start] = 0
+        $sp := 1
+        stk_x[0] = 1
+        stk_y[0] = 1
+        while sp > 0 {
+            cx := stk_x[sp - 1]
+            cy := stk_y[sp - 1]
+            $dc := 0
+            $d := 0
+            while d < 4 {
+                nx := cx + dx[d]
+                ny := cy + dy[d]
+                if nx >= 1 && nx <= w - 2 && ny >= 1 && ny <= h - 2 && grid[ny * w + nx] == 1 {
+                    dirs[dc] = d
+                    dc += 1
+                }
+                d += 1
+            }
+            if dc == 0 {
+                sp -= 1
+            } else {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                pick := dirs[rng % dc]
+                nx := cx + dx[pick]
+                ny := cy + dy[pick]
+                mx := (cx + nx) / 2
+                my := (cy + ny) / 2
+                grid[my * w + mx] = 0
+                grid[ny * w + nx] = 0
+                stk_x[sp] = nx
+                stk_y[sp] = ny
+                sp += 1
+            }
+        }
+
+        $y := 1
+        while y < h - 1 {
+            $x := 1
+            while x < w - 1 {
+                idx := y * w + x
+                if grid[idx] == 1 {
+                    if (grid[idx - 1] == 0 && grid[idx + 1] == 0) || (grid[idx - w] == 0 && grid[idx + w] == 0) {
+                        rng = (rng * 1103515245 + 12345) & 2147483647
+                        if (rng % 100) < 12 {
+                            grid[idx] = 0
+                        }
+                    }
+                }
+                x += 1
+            }
+            y += 1
+        }
+
+        g_score[start] = 0
+        hp.len = 0
+        heap_push($&hp, 156, start)
+        $ans := -1
+        while hp.len > 0 {
+            u := heap_pop($&hp)
+            if closed[u] != 0 {
+                ->
+            }
+            closed[u] = 1
+            if u == goal {
+                ans = g_score[u]
+                <-
+            }
+            gu := g_score[u] + 1
+            ux := u % w
+            uy := u / w
+
+            if uy > 0 {
+                v := u - w
+                if grid[v] == 0 && closed[v] == 0 && gu < g_score[v] {
+                    g_score[v] = gu
+                    $dhx := gx - ux
+                    if dhx < 0 { dhx = -dhx }
+                    $dhy := gy - (uy - 1)
+                    if dhy < 0 { dhy = -dhy }
+                    heap_push($&hp, gu + dhx + dhy, v)
+                }
+            }
+            if uy + 1 < h {
+                v := u + w
+                if grid[v] == 0 && closed[v] == 0 && gu < g_score[v] {
+                    g_score[v] = gu
+                    $dhx := gx - ux
+                    if dhx < 0 { dhx = -dhx }
+                    $dhy := gy - (uy + 1)
+                    if dhy < 0 { dhy = -dhy }
+                    heap_push($&hp, gu + dhx + dhy, v)
+                }
+            }
+            if ux > 0 {
+                v := u - 1
+                if grid[v] == 0 && closed[v] == 0 && gu < g_score[v] {
+                    g_score[v] = gu
+                    $dhx := gx - (ux - 1)
+                    if dhx < 0 { dhx = -dhx }
+                    $dhy := gy - uy
+                    if dhy < 0 { dhy = -dhy }
+                    heap_push($&hp, gu + dhx + dhy, v)
+                }
+            }
+            if ux + 1 < w {
+                v := u + 1
+                if grid[v] == 0 && closed[v] == 0 && gu < g_score[v] {
+                    g_score[v] = gu
+                    $dhx := gx - (ux + 1)
+                    if dhx < 0 { dhx = -dhx }
+                    $dhy := gy - uy
+                    if dhy < 0 { dhy = -dhy }
+                    heap_push($&hp, gu + dhx + dhy, v)
+                }
+            }
+        }
+        sum_d += ans
+        poly_d = (poly_d * 1000003 + ans) % 1000000007
+        m += 1
+    }
+    println(sum_d)
+    println(poly_d)
+    << 0
+}

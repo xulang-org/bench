@@ -19,6 +19,14 @@ on:
         description: 'Specific benchmarks to run (comma-separated, empty for all in mode)'
         required: false
         default: ''
+      shards:
+        description: 'Sharding strategy: auto (wall-clock optimal 20-job split) or 1 (unsharded)'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - '1'
       xu_ref:
         description: 'Xu commit or ref to rebuild and benchmark'
         required: false
@@ -52,11 +60,27 @@ concurrency:
 
 jobs:
   resolve-xu:
-    name: Resolve the Xu commit once for every platform
+    name: Resolve Xu commit & shard plan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
+      build_matrix: ${{ steps.plan.outputs.build_matrix }}
+      bench_matrix: ${{ steps.plan.outputs.bench_matrix }}
+      platform_shards: ${{ steps.plan.outputs.platform_shards }}
+      expect_full_registry: ${{ steps.plan.outputs.expect_full_registry }}
     steps:
+      - name: Checkout bench suite
+        uses: actions/checkout@v6
+        with:
+          path: bench
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
       - name: Resolve the requested Xu ref
         id: resolve
         env:
@@ -67,69 +91,128 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Xu source commit: $SHA"
 
-  benchmark:
+      - name: Plan dynamic build and shard matrices
+        id: plan
+        env:
+          INPUT_MODE: ${{ github.event.inputs.mode || 'full' }}
+          INPUT_BENCHES: ${{ github.event.inputs.benches }}
+          INPUT_SHARDS: ${{ github.event.inputs.shards || 'auto' }}
+          MACOS_ARM64_IMAGE: ${{ github.event.inputs.macos_arm64_image || 'macos-latest' }}
+        run: |
+          python3 bench/scripts/format_summary.py \
+            --plan-ci-matrix \
+            --mode "$INPUT_MODE" \
+            --benches "$INPUT_BENCHES" \
+            --shards "$INPUT_SHARDS" \
+            --macos-arm64-image "$MACOS_ARM64_IMAGE" \
+            --github-output "$GITHUB_OUTPUT"
+
+  build-xu:
     needs: resolve-xu
-    name: ${{ matrix.name }}
+    name: Build Xu (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: Linux ARM64
-            os: ubuntu-24.04-arm
-            platform_id: linux-arm64
-            target: linux-arm64
-            os_name: Linux
-            arch_name: arm64
-            pattern: "*linux-arm64*.tar.gz"
-            archive_type: tar
+      matrix: ${{ fromJson(needs.resolve-xu.outputs.build_matrix) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: bench
 
-          - name: Linux x86_64
-            os: ubuntu-latest
-            platform_id: linux-x64
-            target: linux-x64
-            os_name: Linux
-            arch_name: x86_64
-            pattern: "*linux-x64*.tar.gz"
-            archive_type: tar
+    steps:
+      - name: Checkout bench suite
+        uses: actions/checkout@v6
+        with:
+          path: bench
 
-          - name: macOS ARM64 (Apple Silicon)
-            os: ${{ github.event.inputs.macos_arm64_image || 'macos-latest' }}
-            platform_id: macos-arm64
-            target: macos-arm64
-            os_name: macOS
-            arch_name: arm64
-            pattern: "*macos-arm64*.tar.gz"
-            archive_type: tar
+      - name: Checkout Xu compiler
+        uses: actions/checkout@v6
+        with:
+          repository: xulang-org/xu
+          path: xu
+          ref: ${{ needs.resolve-xu.outputs.sha }}
 
-          - name: macOS x86_64 (Intel)
-            os: macos-15-intel
-            platform_id: macos-x64
-            target: macos-x64
-            os_name: macOS
-            arch_name: x86_64
-            pattern: "*macos-x64*.tar.gz"
-            archive_type: tar
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
 
-          - name: Windows x86_64
-            os: windows-latest
-            platform_id: windows-x64
-            target: windows-x64
-            os_name: Windows
-            arch_name: x86_64
-            pattern: "*windows-x64*.zip"
-            archive_type: zip
+      - name: Ensure Clang is available (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v clang >/dev/null; then
+            if [ -x ../xu/scripts/install_ubuntu_ci_packages.sh ]; then
+              ../xu/scripts/install_ubuntu_ci_packages.sh clang
+            else
+              sudo apt-get update
+              sudo apt-get install -y clang
+            fi
+          fi
+          clang --version
 
-          - name: Windows ARM64
-            os: windows-11-arm
-            platform_id: windows-arm64
-            target: windows-arm64
-            os_name: Windows
-            arch_name: arm64
-            pattern: "*windows-arm64*.zip"
-            archive_type: zip
+      - name: Rebuild the selected Xu commit from a published hosted seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          XU_SDK_SEED_VERSION: ${{ github.event.inputs.seed_version }}
+          XU_BENCH_TARGET: ${{ matrix.target }}
+        run: |
+          EXE=xu
+          if [[ "$XU_BENCH_TARGET" == windows-* ]]; then EXE=xu.exe; fi
+          mkdir -p ../bench-compiler
+          cd ../xu
+          for ATTEMPT in 1 2 3; do
+            if python3 scripts/restore_product_seed.py --target "$XU_BENCH_TARGET" --destination "bin/$EXE"; then
+              break
+            fi
+            if [ "$ATTEMPT" = 3 ]; then exit 1; fi
+            echo "Verified SDK seed download failed; retrying after a transient network error"
+            sleep 10
+          done
+          XU_SKIP_CROSS=1 scripts/build_hosted_chain.sh --candidate-only "bin/$EXE" "../bench-compiler/$EXE"
+          python3 scripts/check_release_identity.py --xu "../bench-compiler/$EXE" --require-cli
+          python3 scripts/check_bootstrap_xu_boundary.py --ci --strict-freeze --json > ../bench-compiler/source-boundary.json
+          CLOSURE=$(python3 -c 'import json; print(json.load(open("../bench-compiler/source-boundary.json"))["source_manifest"]["closure_sha256"])')
+          python3 scripts/verify_product_provenance.py "../bench-compiler/$EXE" --source-closure-sha256 "$CLOSURE"
+          cd ../bench
+          XU_BIN="../bench-compiler/$EXE"
+          "$XU_BIN" --version
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          target = os.environ['XU_BENCH_TARGET']
+          compiler = Path('../bench-compiler') / ('xu.exe' if target.startswith('windows-') else 'xu')
+          provenance = dict(line.split('=', 1) for line in Path(str(compiler) + '.provenance').read_text().splitlines() if '=' in line)
+          identity = {
+              'xu_commit': subprocess.check_output(['git', '-C', '../xu', 'rev-parse', 'HEAD'], text=True).strip(),
+              'bench_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'xu_version': Path('../xu/VERSION').read_text().strip(),
+              'target': target,
+              'compiler_sha256': hashlib.sha256(compiler.read_bytes()).hexdigest(),
+              'source_closure_sha256': provenance['source_closure_sha256'],
+              'seed_sha256': provenance['seed_sha256'],
+              'fixed_point_pair': provenance['fixed_point_pair'],
+          }
+          Path('../bench-compiler/compiler-identity.json').write_text(json.dumps(identity, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(identity, indent=2))
+          PY
 
+      - name: Upload verified Xu compiler artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xu-compiler-${{ matrix.platform_id }}
+          path: bench-compiler
+          retention-days: 1
+          if-no-files-found: error
+
+  benchmark:
+    needs: [resolve-xu, build-xu]
+    name: ${{ matrix.job_name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve-xu.outputs.bench_matrix) }}
     defaults:
       run:
         shell: bash
@@ -174,114 +257,92 @@ jobs:
           fi
           clang --version
 
-      - name: Rebuild the selected Xu commit from a published hosted seed
+      - name: Download verified Xu compiler
+        uses: actions/download-artifact@v4
+        with:
+          name: xu-compiler-${{ matrix.platform_id }}
+          path: bench-compiler
+
+      - name: Prepare and verify downloaded Xu compiler
         env:
-          GH_TOKEN: ${{ github.token }}
-          XU_SDK_SEED_VERSION: ${{ github.event.inputs.seed_version }}
           XU_BENCH_TARGET: ${{ matrix.target }}
+          EXPECTED_XU_COMMIT: ${{ needs.resolve-xu.outputs.sha }}
         run: |
           EXE=xu
           if [[ "$XU_BENCH_TARGET" == windows-* ]]; then EXE=xu.exe; fi
-          mkdir -p reports ../bench-compiler
-          cd ../xu
-          for ATTEMPT in 1 2 3; do
-            if python3 scripts/restore_product_seed.py --target "$XU_BENCH_TARGET" --destination "bin/$EXE"; then
-              break
-            fi
-            if [ "$ATTEMPT" = 3 ]; then exit 1; fi
-            echo "Verified SDK seed download failed; retrying after a transient network error"
-            sleep 10
-          done
-          XU_SKIP_CROSS=1 scripts/build_hosted_chain.sh --candidate-only "bin/$EXE" "../bench-compiler/$EXE"
-          python3 scripts/check_release_identity.py --xu "../bench-compiler/$EXE" --require-cli
-          python3 scripts/check_bootstrap_xu_boundary.py --ci --strict-freeze --json > ../bench-compiler/source-boundary.json
-          CLOSURE=$(python3 -c 'import json; print(json.load(open("../bench-compiler/source-boundary.json"))["source_manifest"]["closure_sha256"])')
-          python3 scripts/verify_product_provenance.py "../bench-compiler/$EXE" --source-closure-sha256 "$CLOSURE"
-          cd ../bench
           XU_BIN="../bench-compiler/$EXE"
-          echo "XU_BIN=$XU_BIN" >> "$GITHUB_ENV"
-          "$XU_BIN" --version
+          if [[ "$XU_BENCH_TARGET" != windows-* ]]; then
+            chmod +x "$XU_BIN"
+          fi
+          mkdir -p reports
+          cp ../bench-compiler/compiler-identity.json reports/compiler-identity.json
           python3 - <<'PY'
           import hashlib, json, os, subprocess
           from pathlib import Path
           target = os.environ['XU_BENCH_TARGET']
           compiler = Path('../bench-compiler') / ('xu.exe' if target.startswith('windows-') else 'xu')
-          provenance = dict(line.split('=', 1) for line in Path(str(compiler) + '.provenance').read_text().splitlines() if '=' in line)
-          identity = {
-              'xu_commit': subprocess.check_output(['git', '-C', '../xu', 'rev-parse', 'HEAD'], text=True).strip(),
-              'bench_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-              'xu_version': Path('../xu/VERSION').read_text().strip(),
-              'target': target,
-              'compiler_sha256': hashlib.sha256(compiler.read_bytes()).hexdigest(),
-              'source_closure_sha256': provenance['source_closure_sha256'],
-              'seed_sha256': provenance['seed_sha256'],
-              'fixed_point_pair': provenance['fixed_point_pair'],
-          }
+          identity = json.loads(Path('reports/compiler-identity.json').read_text(encoding='utf-8'))
+          xu_head = subprocess.check_output(['git', '-C', '../xu', 'rev-parse', 'HEAD'], text=True).strip()
+          bench_head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert identity['target'] == target, f"wrong target: {identity['target']} != {target}"
+          assert identity['xu_commit'] == os.environ['EXPECTED_XU_COMMIT'] == xu_head, 'xu commit mismatch'
+          assert identity['bench_commit'] == bench_head, 'bench commit mismatch'
+          actual_sha = hashlib.sha256(compiler.read_bytes()).hexdigest()
+          assert actual_sha == identity['compiler_sha256'], 'compiler sha256 mismatch after download'
           # Windows invokes the compiler directly; its staged executable is
           # outside an SDK bin/src layout, so supply the selected source root.
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as environment:
+              environment.write(f"XU_BIN={compiler.as_posix()}\n")
               environment.write(f"XU_ROOT={Path('../xu').resolve().as_posix()}\n")
               environment.write(f"XU_STDLIB_ROOT={Path('../xu/src').resolve().as_posix()}\n")
-          Path('reports/compiler-identity.json').write_text(json.dumps(identity, indent=2) + '\n', encoding='utf-8')
-          print(json.dumps(identity, indent=2))
           PY
+          "$XU_BIN" --version
 
-      - name: Run cross-language benchmarks
+      - name: Run cross-language benchmark shard
         id: measure
         continue-on-error: true
+        env:
+          INPUT_MODE: ${{ github.event.inputs.mode || 'full' }}
+          INPUT_BENCHES: ${{ github.event.inputs.benches }}
+          SHARD_SPEC: ${{ matrix.shard }}/${{ matrix.shard_total }}
         run: |
           mkdir -p reports
-          INPUT_MODE="${{ github.event.inputs.mode }}"
-          MODE="${INPUT_MODE:-full}"
-          BENCH_FLAG=""
-          if [ -n "${{ github.event.inputs.benches }}" ]; then
-            BENCH_FLAG="--benches=${{ github.event.inputs.benches }}"
-          elif [ "$MODE" = "quick" ]; then
-            BENCH_FLAG="--quick --benches=startup,loop_sum,fib,nested_loop,method_sum,f64_sum,matmul,string_build,sroa_vec3,copy_bytes,chan_ping,sha256_chain,aes128_encrypt"
+          BENCH_FLAGS=()
+          if [ -n "$INPUT_BENCHES" ]; then
+            BENCH_FLAGS+=("--benches=$INPUT_BENCHES")
+          elif [ "$INPUT_MODE" = "quick" ]; then
+            BENCH_FLAGS+=("--quick" "--benches=startup,loop_sum,fib,nested_loop,method_sum,f64_sum,matmul,string_build,sroa_vec3,copy_bytes,chan_ping,sha256_chain,aes128_encrypt,lzw_codec,plb2_nqueen,scimark_fft,thread_ring,awfy_richards,regex_nfa,treap_ops")
           fi
-          echo "Running cross-language benchmark with mode: $MODE $BENCH_FLAG"
-          python3 scripts/bench_crosslang.py --xu "$XU_BIN" --out reports/crosslang.txt $BENCH_FLAG
+          echo "Running cross-language benchmark shard $SHARD_SPEC (mode=$INPUT_MODE)"
+          python3 scripts/bench_crosslang.py \
+            --xu "$XU_BIN" \
+            --shard "$SHARD_SPEC" \
+            --out reports/crosslang.txt \
+            "${BENCH_FLAGS[@]}"
 
-      - name: Format summary & JSON payload
-        run: |
-          VERSION=$(tr -d '[:space:]' < ../xu/VERSION)
-          python3 scripts/format_summary.py \
-            -i reports/crosslang.txt \
-            -j "reports/benchmarks-${{ matrix.platform_id }}.json" \
-            -s reports/github_summary.md \
-            --xu-version "$VERSION" \
-            --os "${{ matrix.os_name }}" \
-            --arch "${{ matrix.arch_name }}" \
-            --platform-id "${{ matrix.platform_id }}" \
-            --platform-name "${{ matrix.name }}"
-
-      - name: Publish GitHub Step Summary
-        run: |
-          if [ -f reports/github_summary.md ]; then
-            cat reports/github_summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Upload platform benchmark artifacts
+      - name: Upload shard benchmark artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-reports-${{ matrix.platform_id }}
+          name: benchmark-shard-${{ matrix.platform_id }}-${{ matrix.shard }}-of-${{ matrix.shard_total }}
           path: |
             bench/reports/crosslang.txt
-            bench/reports/benchmarks-${{ matrix.platform_id }}.json
-            bench/reports/github_summary.md
             bench/reports/compiler-identity.json
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Report measured compiler or workload failures
         if: steps.measure.outcome == 'failure'
         run: |
-          echo 'Benchmark failures are preserved in the uploaded dataset; this is not a passing compiler validation.'
+          echo 'Benchmark failures are preserved in the uploaded shard dataset; this is not a passing compiler validation.'
           exit 1
 
   aggregate:
     name: Aggregate Multi-Arch Results
-    needs: [resolve-xu, benchmark]
-    if: always() && needs.resolve-xu.result == 'success'
+    needs: [resolve-xu, build-xu, benchmark]
+    if: always() && needs.resolve-xu.result == 'success' && needs.build-xu.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         shell: bash
@@ -297,16 +358,28 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Download all platform artifacts
+      - name: Download all shard artifacts
         uses: actions/download-artifact@v4
         with:
-          path: bench/all-reports
-          pattern: benchmark-reports-*
+          path: bench/all-shards
+          pattern: benchmark-shard-*
           merge-multiple: false
 
-      - name: Merge platform benchmarks and generate overview
+      - name: Merge platform shards and generate summaries
+        env:
+          PLATFORM_SHARDS: ${{ needs.resolve-xu.outputs.platform_shards }}
+          EXPECT_FULL: ${{ needs.resolve-xu.outputs.expect_full_registry }}
         run: |
-          mkdir -p reports
+          mkdir -p reports all-reports
+          EXTRA_FLAGS=()
+          if [ "$EXPECT_FULL" = "true" ]; then
+            EXTRA_FLAGS+=("--expect-full-registry")
+          fi
+          python3 scripts/format_summary.py \
+            --merge-shards-root all-shards \
+            --out-dir all-reports \
+            --platform-shards-json "$PLATFORM_SHARDS" \
+            "${EXTRA_FLAGS[@]}"
           python3 scripts/format_summary.py \
             --merge-dir all-reports \
             --json-out reports/benchmarks-all.json \
@@ -317,7 +390,7 @@ jobs:
           EXPECTED_XU_COMMIT: ${{ needs.resolve-xu.outputs.sha }}
         run: |
           python3 - <<'PY'
-          import json, os
+          import json, os, re
           from pathlib import Path
           expected = {"linux-arm64", "linux-x64", "macos-arm64", "macos-x64", "windows-arm64", "windows-x64"}
           output = Path("reports/benchmarks-all.json")
@@ -327,11 +400,11 @@ jobs:
           cases = None
           for target in sorted(expected):
               rows = platforms[target]["benches"]
-              names = {row["name"] for row in rows}
-              assert names and len(names) == len(rows), f"empty/duplicate cases: {target}"
+              names = [row["name"] for row in rows]
+              assert names and len(set(names)) == len(rows), f"empty/duplicate cases: {target}"
               if cases is None:
                   cases = names
-              assert names == cases, f"different case coverage: {target}"
+              assert names == cases, f"different case order or coverage: {target}"
               allowed_failures = {'compile_failed', 'run_failed', 'stdout_mismatch', 'measurement_failed'}
               for row in rows:
                   status = row.get('xu_status', 'ok')
@@ -344,6 +417,8 @@ jobs:
               identity = json.loads(identity_file.read_text(encoding="utf-8"))
               assert identity["target"] == target, f"wrong compiler target: {target}"
               assert identity["xu_commit"] == os.environ["EXPECTED_XU_COMMIT"], f"mixed Xu source: {target}"
+              for field in ("compiler_sha256", "source_closure_sha256"):
+                  assert re.fullmatch(r"[0-9a-f]{64}", identity[field]), f"invalid {field}: {target}"
           payload["metadata"]["xu_commit"] = os.environ["EXPECTED_XU_COMMIT"]
           output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           print(f"Validated {len(expected)} platforms × {len(cases)} cases from one Xu commit")
@@ -355,6 +430,48 @@ jobs:
             cat reports/multi_arch_summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Upload merged benchmark-reports-linux-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-linux-arm64
+          path: bench/all-reports/benchmark-reports-linux-arm64
+          if-no-files-found: error
+
+      - name: Upload merged benchmark-reports-linux-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-linux-x64
+          path: bench/all-reports/benchmark-reports-linux-x64
+          if-no-files-found: error
+
+      - name: Upload merged benchmark-reports-macos-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-macos-arm64
+          path: bench/all-reports/benchmark-reports-macos-arm64
+          if-no-files-found: error
+
+      - name: Upload merged benchmark-reports-macos-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-macos-x64
+          path: bench/all-reports/benchmark-reports-macos-x64
+          if-no-files-found: error
+
+      - name: Upload merged benchmark-reports-windows-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-windows-x64
+          path: bench/all-reports/benchmark-reports-windows-x64
+          if-no-files-found: error
+
+      - name: Upload merged benchmark-reports-windows-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports-windows-arm64
+          path: bench/all-reports/benchmark-reports-windows-arm64
+          if-no-files-found: error
+
       - name: Upload merged multi-arch benchmark dataset
         uses: actions/upload-artifact@v4
         with:
@@ -362,3 +479,4 @@ jobs:
           path: |
             bench/reports/benchmarks-all.json
             bench/reports/multi_arch_summary.md
+          if-no-files-found: error

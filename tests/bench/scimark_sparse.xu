@@ -1,0 +1,135 @@
+@main
+
+#math
+
+struct SciRandom {
+    pub m []int
+    pub idx_i int
+    pub idx_j int
+}
+
+fn new_random(seed int) SciRandom {
+    m1 := 2147483647
+    m2 := 65536
+    $m := []int{}
+    $k := 0
+    while k < 17 {
+        m.push(0)
+        k += 1
+    }
+    $jseed := seed
+    if jseed < 0 {
+        jseed = 0 - jseed
+    }
+    if jseed > m1 {
+        jseed = m1
+    }
+    if jseed % 2 == 0 {
+        jseed -= 1
+    }
+    k0 := 9069 % m2
+    k1 := 9069 / m2
+    $j0 := jseed % m2
+    $j1 := jseed / m2
+    $iloop := 0
+    while iloop < 17 {
+        jseed = j0 * k0
+        j1 = (jseed / m2 + j0 * k1 + j1 * k0) % (m2 / 2)
+        j0 = jseed % m2
+        m[iloop] = j0 + m2 * j1
+        iloop += 1
+    }
+    << SciRandom{m: m, idx_i: 4, idx_j: 16}
+}
+
+fn (r $&SciRandom) next_double() f64 {
+    m1 := 2147483647
+    dm1 := 1.0 / 2147483647.0
+    $k := r.m[r.idx_i] - r.m[r.idx_j]
+    if k < 0 {
+        k += m1
+    }
+    r.m[r.idx_j] = k
+    if r.idx_i == 0 {
+        r.idx_i = 16
+    } else {
+        r.idx_i -= 1
+    }
+    if r.idx_j == 0 {
+        r.idx_j = 16
+    } else {
+        r.idx_j -= 1
+    }
+    << dm1 * f64(k)
+}
+
+fn main() int {
+    n := 10000
+    nz := 50000
+    nr := 5
+    $rng := new_random(101010)
+    $x := []f64{}
+    $y := []f64{}
+    $val := []f64{}
+    $col := []int{}
+    $row := []int{}
+
+    $i := 0
+    while i < n {
+        x.push(rng.next_double())
+        y.push(0.0)
+        row.push(0)
+        i += 1
+    }
+    row.push(0)
+    i = 0
+    while i < nz {
+        val.push(rng.next_double())
+        col.push(0)
+        i += 1
+    }
+
+    $r := 0
+    while r < n {
+        row_r := row[r]
+        row[r + 1] = row_r + nr
+        $step := r / nr
+        if step < 1 {
+            step = 1
+        }
+        $j := 0
+        while j < nr {
+            col[row_r + j] = (j * step) % n
+            j += 1
+        }
+        r += 1
+    }
+
+    $acc := 0.0
+    $rep := 0
+    while rep < 500 {
+        r = 0
+        while r < n {
+            $s := 0.0
+            $ii := row[r]
+            end_ii := row[r + 1]
+            while ii < end_ii {
+                s += x[col[ii]] * val[ii]
+                ii += 1
+            }
+            y[r] = s
+            r += 1
+        }
+        acc += y[rep % n]
+        rep += 1
+    }
+
+    $total := acc
+    i = 0
+    while i < n {
+        total += y[i]
+        i += 1
+    }
+    println(int(math.floor(total * 1000.0 + 0.5)))
+    << 0
+}

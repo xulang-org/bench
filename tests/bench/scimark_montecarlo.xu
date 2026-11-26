@@ -1,0 +1,78 @@
+@main
+
+struct SciRandom {
+    pub m []int
+    pub idx_i int
+    pub idx_j int
+}
+
+fn new_random(seed int) SciRandom {
+    m1 := 2147483647
+    m2 := 65536
+    $m := []int{}
+    $k := 0
+    while k < 17 {
+        m.push(0)
+        k += 1
+    }
+    $jseed := seed
+    if jseed < 0 {
+        jseed = 0 - jseed
+    }
+    if jseed > m1 {
+        jseed = m1
+    }
+    if jseed % 2 == 0 {
+        jseed -= 1
+    }
+    k0 := 9069 % m2
+    k1 := 9069 / m2
+    $j0 := jseed % m2
+    $j1 := jseed / m2
+    $iloop := 0
+    while iloop < 17 {
+        jseed = j0 * k0
+        j1 = (jseed / m2 + j0 * k1 + j1 * k0) % (m2 / 2)
+        j0 = jseed % m2
+        m[iloop] = j0 + m2 * j1
+        iloop += 1
+    }
+    << SciRandom{m: m, idx_i: 4, idx_j: 16}
+}
+
+fn (r $&SciRandom) next_double() f64 {
+    m1 := 2147483647
+    dm1 := 1.0 / 2147483647.0
+    $k := r.m[r.idx_i] - r.m[r.idx_j]
+    if k < 0 {
+        k += m1
+    }
+    r.m[r.idx_j] = k
+    if r.idx_i == 0 {
+        r.idx_i = 16
+    } else {
+        r.idx_i -= 1
+    }
+    if r.idx_j == 0 {
+        r.idx_j = 16
+    } else {
+        r.idx_j -= 1
+    }
+    << dm1 * f64(k)
+}
+
+fn main() int {
+    $rng := new_random(113)
+    $under := 0
+    $i := 0
+    while i < 5000000 {
+        x := rng.next_double()
+        y := rng.next_double()
+        if x * x + y * y <= 1.0 {
+            under += 1
+        }
+        i += 1
+    }
+    println(under)
+    << 0
+}

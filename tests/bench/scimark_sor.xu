@@ -1,0 +1,104 @@
+@main
+
+#math
+
+struct SciRandom {
+    pub m []int
+    pub idx_i int
+    pub idx_j int
+}
+
+fn new_random(seed int) SciRandom {
+    m1 := 2147483647
+    m2 := 65536
+    $m := []int{}
+    $k := 0
+    while k < 17 {
+        m.push(0)
+        k += 1
+    }
+    $jseed := seed
+    if jseed < 0 {
+        jseed = 0 - jseed
+    }
+    if jseed > m1 {
+        jseed = m1
+    }
+    if jseed % 2 == 0 {
+        jseed -= 1
+    }
+    k0 := 9069 % m2
+    k1 := 9069 / m2
+    $j0 := jseed % m2
+    $j1 := jseed / m2
+    $iloop := 0
+    while iloop < 17 {
+        jseed = j0 * k0
+        j1 = (jseed / m2 + j0 * k1 + j1 * k0) % (m2 / 2)
+        j0 = jseed % m2
+        m[iloop] = j0 + m2 * j1
+        iloop += 1
+    }
+    << SciRandom{m: m, idx_i: 4, idx_j: 16}
+}
+
+fn (r $&SciRandom) next_double() f64 {
+    m1 := 2147483647
+    dm1 := 1.0 / 2147483647.0
+    $k := r.m[r.idx_i] - r.m[r.idx_j]
+    if k < 0 {
+        k += m1
+    }
+    r.m[r.idx_j] = k
+    if r.idx_i == 0 {
+        r.idx_i = 16
+    } else {
+        r.idx_i -= 1
+    }
+    if r.idx_j == 0 {
+        r.idx_j = 16
+    } else {
+        r.idx_j -= 1
+    }
+    << dm1 * f64(k)
+}
+
+fn main() int {
+    n := 100
+    $rng := new_random(101010)
+    $g := []f64{}
+    $idx := 0
+    while idx < n * n {
+        g.push(rng.next_double())
+        idx += 1
+    }
+
+    omega := 1.25
+    omega_over_four := omega * 0.25
+    one_minus_omega := 1.0 - omega
+    $p := 0
+    while p < 500 {
+        $i := 1
+        while i < n - 1 {
+            row := i * n
+            up := (i - 1) * n
+            dn := (i + 1) * n
+            $j := 1
+            while j < n - 1 {
+                g[row + j] = omega_over_four * (g[up + j] + g[dn + j] + g[row + j - 1] + g[row + j + 1]) + one_minus_omega * g[row + j]
+                j += 1
+            }
+            i += 1
+        }
+        p += 1
+    }
+
+    $total := 0.0
+    idx = 0
+    while idx < n * n {
+        total += g[idx]
+        idx += 1
+    }
+    println(int(math.floor(total * 1000.0 + 0.5)))
+    << 0
+}

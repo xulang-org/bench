@@ -47,14 +47,18 @@ RSS 表头标明实际采样协议。编译器提供 `--timings` 时，报告显
 标准库文件 I/O 负载在临时目录创建或文件写入失败时返回非零状态，避免将错误标记
 误存为成功的性能样本。
 
-更多负载说明见 [套件索引](tests/bench/README.md)。
-[Osprey 24 题](tests/bench/osprey/README.md) 保持上游原始工作量与 MIT 来源，
-各题提供 Xu / Go / C / Rust / Swift 端口；C 主机横测在缺少 Clang 时使用 GCC。
+更多负载说明见 [套件索引](tests/bench/README.md)。当前已注册 95 项跨语言负载（可通过 `make list` 查看完整清单），除既有基础能力、标准库/密码学及 [Osprey 24 题](tests/bench/osprey/README.md) 外，还覆盖以下扩充专题：
+- 经典数据结构、流密码与编解码 5 题：`avl_tree`、`chacha20_stream`、`huffman_coding`、`json_tokenizer`、`lzw_codec`（各提供 5 语言端口）；
+- [PLB2 3 题](tests/bench/plb2/README.md)：`plb2_nqueen`、`plb2_sudoku`、`plb2_bedcov`（MIT 来源，5 语言端口）；
+- 并发调度 2 题：`thread_ring`（Go / Rust）、`skynet`（Go）；
+- [SciMark2 5 题](tests/bench/scimark2/README.md)：`scimark_montecarlo`、`scimark_sor`、`scimark_lu`、`scimark_sparse`、`scimark_fft`（NIST 数值计算核，5 语言端口；Unix C 自动附加 `-lm`）；
+- [AWFY 与进阶 8 题](tests/bench/awfy/README.md)：`awfy_richards`、`awfy_json_parser`、`brainfuck_vm`、`regex_nfa`、`treap_ops`、`astar_maze`、`levenshtein_dp`、`csv_aggregate`（5 语言端口）。
+[Osprey 24 题](tests/bench/osprey/README.md) 保持上游原始工作量与 MIT 来源，各题提供 Xu / Go / C / Rust / Swift 端口；C 主机横测在缺少 Clang 时使用 GCC。
 
 `http_concurrent` 使用 16 个 worker，各执行 200 次自环回 HTTP 请求。
 每次请求建立新 TCP 连接，校验响应正文和固定校验和；Xu、Go、Rust 提供对照实现。
 Go 使用 `net/http`，Rust 使用标准库线程与最小 HTTP 服务，结果包含连接、调度和协议开销。
-Xu 0.12.4 的六平台横测包含该负载及其 Go、Rust 对照，完整结果共 72 项负载。
+Xu 0.12.4 的六平台历史横测包含该负载及其 Go、Rust 对照（当时共 72 项负载，现已扩充至 95 项）。
 [Actions 实测记录](https://github.com/xulang-org/bench/actions/runs/43736137952)
 Windows 的临时 TCP 端口会被 `TIME_WAIT` 保留。每次启动该负载前，工具读取实际 IPv4
 动态端口范围与 TCP 表，等待足够容纳 3200 次新连接及 1024 个余量；各语言使用同一准入
@@ -92,6 +96,11 @@ RSS 描述目标进程本身，不合计子进程；原生负载只允许一次 
 其原有版权与许可；Benchmarks Game 金标输出的来源、校验值和上游许可见
 [golden 说明](tests/bench/game/golden/README.md)。
 
-### 六平台发布门禁
+### 六平台发布门禁与 CI 并行分片
 
-横测的 Linux、macOS、Windows × ARM64/x86_64 六个作业均为必需项。任一作业失败时不聚合发布；聚合后还会核对六个平台、相同的用例集合、有效 Xu 测量及同一源码提交。失败或缺失的架构不能成为一份成功的完整横测。CPU 时间受系统计时分辨率影响，不以零值单独判定失败。
+横测的 Linux、macOS、Windows × ARM64/x86_64 六个平台均为必需项；任一平台缺失或不完整时不聚合发布。GitHub Actions 工作流（[`.github/workflows/bench.yml`](.github/workflows/bench.yml)）采用三段式流水线：
+1. `build-xu`：六个平台各自只构建一次自举产物编译器并产出 `compiler-identity.json`；
+2. `benchmark`：`full` 模式下按运行器配额做 20 并发成本均衡分片（`linux-x64` ×4、`windows-x64` ×4、`windows-arm64` ×4、`linux-arm64` ×3、`macos-x64` ×3、`macos-arm64` ×2，控制 macOS 并发为 5、总并发为 20；`quick`、指定 `benches` 或手动 `shards=1` 时每平台 1 片），通过 `scripts/bench_crosslang.py --shard k/N` 调度；
+3. `aggregate`：严格校验同一平台各分片的编译器 SHA-256、工具链版本与 RSS 协议完全一致后无损合回完整的 `benchmark-reports-<platform_id>` 产物及六平台汇总矩阵。
+
+聚合后继续核对六个平台、相同的用例集合、有效 Xu 测量及同一源码提交。失败或缺失的架构不能成为一份成功的完整横测。CPU 时间受系统计时分辨率影响，不以零值单独判定失败。
