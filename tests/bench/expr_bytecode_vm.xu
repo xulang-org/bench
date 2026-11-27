@@ -1,0 +1,314 @@
+@main
+
+struct Compiler {
+    pub tk []int
+    pub tv []int
+    pub pos int
+    pub code []int
+    pub imm []int
+}
+
+fn lex_expr(c $&Compiler, s string) {
+    mask30 := 1073741823
+    c.tk = []int{}
+    c.tv = []int{}
+    $i := 0
+    n := s.len
+    while i < n {
+        b := s[i] & 255
+        if b == 32 {
+            i += 1
+        } else if b >= 48 && b <= 57 {
+            $v := 0
+            while i < n {
+                db := s[i] & 255
+                if db < 48 || db > 57 {
+                    <-
+                }
+                v = (v * 10 + (db - 48)) & mask30
+                i += 1
+            }
+            c.tk.push(1)
+            c.tv.push(v)
+        } else if b == 120 {
+            c.tk.push(2)
+            c.tv.push(0)
+            i += 1
+        } else if b == 121 {
+            c.tk.push(3)
+            c.tv.push(0)
+            i += 1
+        } else if b == 122 {
+            c.tk.push(4)
+            c.tv.push(0)
+            i += 1
+        } else if b == 43 {
+            c.tk.push(5)
+            c.tv.push(0)
+            i += 1
+        } else if b == 45 {
+            c.tk.push(6)
+            c.tv.push(0)
+            i += 1
+        } else if b == 42 {
+            c.tk.push(7)
+            c.tv.push(0)
+            i += 1
+        } else if b == 47 {
+            c.tk.push(8)
+            c.tv.push(0)
+            i += 1
+        } else if b == 37 {
+            c.tk.push(9)
+            c.tv.push(0)
+            i += 1
+        } else if b == 38 {
+            c.tk.push(10)
+            c.tv.push(0)
+            i += 1
+        } else if b == 124 {
+            c.tk.push(11)
+            c.tv.push(0)
+            i += 1
+        } else if b == 94 {
+            c.tk.push(12)
+            c.tv.push(0)
+            i += 1
+        } else if b == 126 {
+            c.tk.push(13)
+            c.tv.push(0)
+            i += 1
+        } else if b == 40 {
+            c.tk.push(14)
+            c.tv.push(0)
+            i += 1
+        } else {
+            c.tk.push(15)
+            c.tv.push(0)
+            i += 1
+        }
+    }
+    c.tk.push(0)
+    c.tv.push(0)
+    c.pos = 0
+    c.code = []int{}
+    c.imm = []int{}
+}
+
+fn parse_prim(c $&Compiler) {
+    t := c.tk[c.pos]
+    if t == 1 {
+        c.code.push(1)
+        c.imm.push(c.tv[c.pos])
+        c.pos += 1
+    } else if t == 2 {
+        c.code.push(2)
+        c.imm.push(0)
+        c.pos += 1
+    } else if t == 3 {
+        c.code.push(3)
+        c.imm.push(0)
+        c.pos += 1
+    } else if t == 4 {
+        c.code.push(4)
+        c.imm.push(0)
+        c.pos += 1
+    } else {
+        c.pos += 1
+        parse_or(c)
+        c.pos += 1
+    }
+}
+
+fn parse_unary(c $&Compiler) {
+    t := c.tk[c.pos]
+    if t == 6 {
+        c.pos += 1
+        parse_unary(c)
+        c.code.push(13)
+        c.imm.push(0)
+    } else if t == 13 {
+        c.pos += 1
+        parse_unary(c)
+        c.code.push(14)
+        c.imm.push(0)
+    } else {
+        parse_prim(c)
+    }
+}
+
+fn parse_mul(c $&Compiler) {
+    parse_unary(c)
+    while c.tk[c.pos] == 7 || c.tk[c.pos] == 8 || c.tk[c.pos] == 9 {
+        op := c.tk[c.pos]
+        c.pos += 1
+        parse_unary(c)
+        c.code.push(op)
+        c.imm.push(0)
+    }
+}
+
+fn parse_add(c $&Compiler) {
+    parse_mul(c)
+    while c.tk[c.pos] == 5 || c.tk[c.pos] == 6 {
+        op := c.tk[c.pos]
+        c.pos += 1
+        parse_mul(c)
+        c.code.push(op)
+        c.imm.push(0)
+    }
+}
+
+fn parse_and(c $&Compiler) {
+    parse_add(c)
+    while c.tk[c.pos] == 10 {
+        c.pos += 1
+        parse_add(c)
+        c.code.push(10)
+        c.imm.push(0)
+    }
+}
+
+fn parse_xor(c $&Compiler) {
+    parse_and(c)
+    while c.tk[c.pos] == 12 {
+        c.pos += 1
+        parse_and(c)
+        c.code.push(12)
+        c.imm.push(0)
+    }
+}
+
+fn parse_or(c $&Compiler) {
+    parse_xor(c)
+    while c.tk[c.pos] == 11 {
+        c.pos += 1
+        parse_xor(c)
+        c.code.push(11)
+        c.imm.push(0)
+    }
+}
+
+fn main() int {
+    mod_v := 1000000007
+    mask30 := 1073741823
+    base30 := 1073741824
+
+    $exprs := []string{}
+    exprs.push("((x + y) * (z + 7) - (x ^ y)) / ((z & 15) + 1) + (x % 97)")
+    exprs.push("(~x & 65535) + ((y * 13 + z) ^ (x + y + z)) - (y / 3)")
+    exprs.push("((x * 3 + y * 5 + z * 7) ^ (x * 11 - y)) + ((z | 255) & (x + 1023))")
+    exprs.push("-(x - y) + (z * (x & 255) + (y % 31)) ^ (~z & 4095)")
+    exprs.push("(((x + 17) * (y + 29)) % 65521) + ((z ^ (x + y)) / ((x & 7) + 1))")
+    exprs.push("((x | y) & (y | z) & (z | x)) + ((x ^ y ^ z) * 19) - (z % 17)")
+    exprs.push("(x + (y + (z + (x * 3 + (y * 5 - z))))) & 1048575")
+    exprs.push("((x / 5 + y / 7 + z / 11) * (x % 13 + y % 17 + 1)) ^ (x + z)")
+    exprs.push("((~x & 1023) * (~y & 1023) + (~z & 1023)) % 1000003")
+    exprs.push("(((x ^ 12345) + (y ^ 6789)) * 7) / ((z % 23) + 2) + (y & 511)")
+    exprs.push("(x * (y & 63) - y * (z & 63) + z * (x & 63)) ^ ((x + y) | z)")
+    exprs.push("((x + y + z) * (x + y + z)) / (x % 29 + y % 31 + 3) + (~(x & y) & 8191)")
+    exprs.push("(((x & 4095) + 1) * ((y & 4095) + 3) + ((z & 4095) + 5)) ^ (x * 17)")
+    exprs.push("((x - (y - (z - x))) + (y * 9 - z * 5)) % 99991 + (x & z)")
+    exprs.push("((x | 85) ^ (y | 170) ^ (z | 51)) + ((x + y) * 23) / ((y & 31) + 1)")
+    exprs.push("((((x + 3) * 5 - y) ^ (z + 11)) + ((y + 7) * (z & 127))) % 524287")
+
+    $comp := Compiler{
+        tk: []int{},
+        tv: []int{},
+        pos: 0,
+        code: []int{},
+        imm: []int{}
+    }
+    $st := []int{}
+    $k := 0
+    while k < 32 {
+        st.push(0)
+        k += 1
+    }
+
+    $total_insts := 0
+    $ck := 0
+    $rng := 112233445
+    $rnd := 0
+    while rnd < 160 {
+        $ei := 0
+        while ei < 16 {
+            lex_expr($&comp, exprs[ei])
+            parse_or($&comp)
+            comp.code.push(0)
+            comp.imm.push(0)
+
+            $run_i := 0
+            while run_i < 100 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                x := rng & 65535
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                y := rng & 65535
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                z := rng & 65535
+
+                $sp := 0
+                $ip := 0
+                $steps := 0
+                while true {
+                    op := comp.code[ip]
+                    if op == 0 {
+                        <-
+                    }
+                    steps += 1
+                    if op == 1 {
+                        st[sp] = comp.imm[ip]
+                        sp += 1
+                    } else if op == 2 {
+                        st[sp] = x
+                        sp += 1
+                    } else if op == 3 {
+                        st[sp] = y
+                        sp += 1
+                    } else if op == 4 {
+                        st[sp] = z
+                        sp += 1
+                    } else if op == 5 {
+                        sp -= 1
+                        st[sp - 1] = (st[sp - 1] + st[sp]) & mask30
+                    } else if op == 6 {
+                        sp -= 1
+                        st[sp - 1] = (st[sp - 1] - st[sp] + base30) & mask30
+                    } else if op == 7 {
+                        sp -= 1
+                        st[sp - 1] = ((st[sp - 1] & 32767) * (st[sp] & 32767)) & mask30
+                    } else if op == 8 {
+                        sp -= 1
+                        st[sp - 1] = st[sp - 1] / (st[sp] + 1)
+                    } else if op == 9 {
+                        sp -= 1
+                        st[sp - 1] = st[sp - 1] % (st[sp] + 1)
+                    } else if op == 10 {
+                        sp -= 1
+                        st[sp - 1] = st[sp - 1] & st[sp]
+                    } else if op == 11 {
+                        sp -= 1
+                        st[sp - 1] = st[sp - 1] | st[sp]
+                    } else if op == 12 {
+                        sp -= 1
+                        st[sp - 1] = st[sp - 1] ^ st[sp]
+                    } else if op == 13 {
+                        st[sp - 1] = (base30 - st[sp - 1]) & mask30
+                    } else {
+                        st[sp - 1] = st[sp - 1] ^ mask30
+                    }
+                    ip += 1
+                }
+                total_insts += steps
+                ck = (ck * 31 + st[sp - 1]) % mod_v
+                run_i += 1
+            }
+            ei += 1
+        }
+        rnd += 1
+    }
+
+    println(total_insts)
+    println(ck)
+    << 0
+}

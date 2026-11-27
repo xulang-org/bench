@@ -44,8 +44,8 @@ class TestBatchCRegistryAndGoldens(unittest.TestCase):
                 break
         self.assertIsNotNone(benches_node)
         ast_names = [elt.args[0].value for elt in benches_node.elts]
-        self.assertEqual(len(ast_names), 95)
-        self.assertEqual(len(set(ast_names)), 95)
+        self.assertGreaterEqual(len(ast_names), 95)
+        self.assertEqual(len(set(ast_names)), len(ast_names))
         name_re = re.compile(r"^[a-z][a-z0-9_]*$")
         for name in ast_names:
             self.assertRegex(name, name_re)

@@ -1,0 +1,96 @@
+@main
+
+fn worker(job_ch chan int, res_ch chan int) {
+    mod_v := 1000000007
+    $hist := []int{}
+    $b := 0
+    while b < 256 {
+        hist.push(0)
+        b += 1
+    }
+    while true {
+        tid := <-job_ch
+        if tid < 0 {
+            <<
+        }
+        b = 0
+        while b < 256 {
+            hist[b] = 0
+            b += 1
+        }
+        $rng := (tid + 1) * 1000003 + 98765
+        $i := 0
+        while i < 131072 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            bkt := (rng >> 8) & 255
+            val := 1 + ((rng >> 16) & 1023)
+            hist[bkt] += val
+            i += 1
+        }
+        $lh := tid + 1
+        b = 0
+        while b < 256 {
+            lh = (lh * 131 + hist[b]) % mod_v
+            b += 1
+        }
+        res_ch <- (lh * 128 + tid)
+    }
+}
+
+fn main() int {
+    mod_v := 1000000007
+    n_workers := 8
+    n_tasks := 64
+
+    $job_chs := []chan int{}
+    $w := 0
+    while w < n_workers {
+        job_chs.push(chan int{cap: 16})
+        w += 1
+    }
+    res_ch := chan int{cap: 64}
+
+    w = 0
+    while w < n_workers {
+        xu worker(job_chs[w], res_ch)
+        w += 1
+    }
+
+    $tid := 0
+    while tid < n_tasks {
+        job_chs[tid & 7] <- tid
+        tid += 1
+    }
+    w = 0
+    while w < n_workers {
+        job_chs[w] <- -1
+        w += 1
+    }
+
+    $slot_hash := []int{}
+    tid = 0
+    while tid < n_tasks {
+        slot_hash.push(0)
+        tid += 1
+    }
+
+    $done_cnt := 0
+    while done_cnt < n_tasks {
+        packed := <-res_ch
+        rtid := packed & 127
+        rlh := packed >> 7
+        slot_hash[rtid] = rlh
+        done_cnt += 1
+    }
+
+    $ck := 0
+    tid = 0
+    while tid < n_tasks {
+        ck = (ck * 31 + slot_hash[tid]) % mod_v
+        tid += 1
+    }
+
+    println(n_tasks * 131072)
+    println(ck)
+    << 0
+}

@@ -1,0 +1,253 @@
+@main
+
+fn push_str(buf $&[]int, s string) {
+    $i := 0
+    while i < s.len {
+        buf.push(s[i] & 255)
+        i += 1
+    }
+}
+
+fn push_int(buf $&[]int, v int) {
+    $x := v
+    if x < 0 {
+        buf.push(45)
+        x = -x
+    }
+    if x == 0 {
+        buf.push(48)
+        <<
+    }
+    $digs := []int{}
+    $k := 0
+    while k < 16 {
+        digs.push(0)
+        k += 1
+    }
+    $dc := 0
+    while x > 0 {
+        digs[dc] = 48 + (x % 10)
+        dc += 1
+        x /= 10
+    }
+    $i := dc - 1
+    while i >= 0 {
+        buf.push(digs[i])
+        i -= 1
+    }
+}
+
+fn push_2d(buf $&[]int, v int) {
+    buf.push(48 + (v / 10))
+    buf.push(48 + (v % 10))
+}
+
+struct ValRes {
+    val   int
+    nextp int
+}
+
+fn parse_val(doc &[]int, start int, n int) ValRes {
+    mod_v := 1000000007
+    $p := start
+    if doc[p] == 34 {
+        p += 1
+        $vh := 17
+        while p < n && doc[p] != 34 {
+            $ch := doc[p]
+            if ch == 92 && p + 1 < n {
+                p += 1
+                e := doc[p]
+                if e == 110 {
+                    ch = 10
+                } else if e == 116 {
+                    ch = 9
+                } else if e == 34 {
+                    ch = 34
+                } else if e == 92 {
+                    ch = 92
+                } else {
+                    ch = e
+                }
+            }
+            vh = (vh * 131 + ch) % mod_v
+            p += 1
+        }
+        if p < n {
+            p += 1
+        }
+        << ValRes{val: vh, nextp: p}
+    } else if doc[p] == 91 {
+        p += 1
+        $ah := 29
+        while p < n {
+            while p < n && (doc[p] == 32 || doc[p] == 9 || doc[p] == 44) {
+                p += 1
+            }
+            if p >= n || doc[p] == 93 {
+                if p < n {
+                    p += 1
+                }
+                <-
+            }
+            sub := parse_val(doc, p, n)
+            ah = (ah * 257 + sub.val) % mod_v
+            p = sub.nextp
+        }
+        << ValRes{val: ah, nextp: p}
+    } else if doc[p] == 116 {
+        << ValRes{val: 1, nextp: p + 4}
+    } else if doc[p] == 102 {
+        << ValRes{val: 0, nextp: p + 5}
+    }
+    $neg := false
+    if doc[p] == 45 {
+        neg = true
+        p += 1
+    }
+    $v := 0
+    while p < n && ((doc[p] >= 48 && doc[p] <= 57) || doc[p] == 95) {
+        if doc[p] != 95 {
+            v = v * 10 + (doc[p] - 48)
+        }
+        p += 1
+    }
+    if neg {
+        v = -v
+    }
+    v = v % mod_v
+    if v < 0 {
+        v += mod_v
+    }
+    << ValRes{val: v, nextp: p}
+}
+
+fn main() int {
+    mod_v := 1000000007
+    $doc := []int{}
+    push_str($&doc, "# Auto-generated microservice configuration\n")
+    $s := 0
+    while s < 48 {
+        push_str($&doc, "\n[svc_")
+        push_2d($&doc, s)
+        push_str($&doc, "]\n")
+
+        push_str($&doc, "name = \"worker-")
+        push_2d($&doc, s)
+        push_str($&doc, "\\tprod\\n\\\"v")
+        push_int($&doc, s % 5)
+        push_str($&doc, "\\\"\" # inline comment\n")
+
+        push_str($&doc, "port = ")
+        push_int($&doc, 8000 + s * 10)
+        doc.push(10)
+
+        push_str($&doc, "max_conn = ")
+        push_int($&doc, 1000 + (s % 7) * 500)
+        doc.push(95)
+        push_int($&doc, 100 + s)
+        doc.push(10)
+
+        if (s & 1) == 0 {
+            push_str($&doc, "enabled = true\n")
+        } else {
+            push_str($&doc, "enabled = false\n")
+        }
+
+        if (s % 9) == 0 {
+            push_str($&doc, "timeout_ms = -")
+            push_int($&doc, 50 + s * 3)
+            doc.push(10)
+        } else {
+            push_str($&doc, "timeout_ms = ")
+            push_int($&doc, 250 + s * 15)
+            doc.push(10)
+        }
+
+        push_str($&doc, "retries = [")
+        push_int($&doc, 1 + (s % 3))
+        push_str($&doc, ", ")
+        push_int($&doc, 2 + (s % 5))
+        push_str($&doc, ", ")
+        push_int($&doc, 4 + (s % 7))
+        push_str($&doc, ", ")
+        push_int($&doc, 8 + (s % 11))
+        push_str($&doc, "]\n")
+
+        push_str($&doc, "endpoints = [\"/v1/s")
+        push_int($&doc, s)
+        push_str($&doc, "\", \"/health\\t")
+        push_int($&doc, s)
+        push_str($&doc, "\", \"/metrics\"]\n")
+        s += 1
+    }
+
+    n := doc.len
+    $total_entries := 0
+    $ck := 0
+    $rnd := 0
+    while rnd < 1000 {
+        $pos := 0
+        $sec_hash := 0
+        $entries := 0
+        $round_ck := 0
+        while pos < n {
+            while pos < n && (doc[pos] == 32 || doc[pos] == 9 || doc[pos] == 10 || doc[pos] == 13) {
+                pos += 1
+            }
+            if pos >= n {
+                <-
+            }
+            c := doc[pos]
+            if c == 35 {
+                while pos < n && doc[pos] != 10 {
+                    pos += 1
+                }
+                ->
+            }
+            if c == 91 {
+                pos += 1
+                $sh := 0
+                while pos < n && doc[pos] != 93 {
+                    sh = (sh * 131 + doc[pos]) % mod_v
+                    pos += 1
+                }
+                if pos < n {
+                    pos += 1
+                }
+                sec_hash = sh
+                while pos < n && doc[pos] != 10 {
+                    pos += 1
+                }
+                ->
+            }
+            $kh := sec_hash
+            while pos < n && doc[pos] != 61 && doc[pos] != 32 && doc[pos] != 9 && doc[pos] != 10 {
+                kh = (kh * 131 + doc[pos]) % mod_v
+                pos += 1
+            }
+            while pos < n && (doc[pos] == 32 || doc[pos] == 9) {
+                pos += 1
+            }
+            if pos < n && doc[pos] == 61 {
+                pos += 1
+            }
+            while pos < n && (doc[pos] == 32 || doc[pos] == 9) {
+                pos += 1
+            }
+            res := parse_val(&doc, pos, n)
+            pos = res.nextp
+            while pos < n && doc[pos] != 10 {
+                pos += 1
+            }
+            entries += 1
+            round_ck = (round_ck * 31 + (kh * 7 + res.val + rnd) % mod_v) % mod_v
+        }
+        total_entries += entries
+        ck = (ck * 37 + round_ck) % mod_v
+        rnd += 1
+    }
+    println(total_entries)
+    println(ck)
+    << 0
+}

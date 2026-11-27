@@ -47,18 +47,22 @@ RSS 表头标明实际采样协议。编译器提供 `--timings` 时，报告显
 标准库文件 I/O 负载在临时目录创建或文件写入失败时返回非零状态，避免将错误标记
 误存为成功的性能样本。
 
-更多负载说明见 [套件索引](tests/bench/README.md)。当前已注册 95 项跨语言负载（可通过 `make list` 查看完整清单），除既有基础能力、标准库/密码学及 [Osprey 24 题](tests/bench/osprey/README.md) 外，还覆盖以下扩充专题：
+更多负载说明见 [套件索引](tests/bench/README.md)。当前已注册 121 项跨语言负载（可通过 `make list` 查看完整清单），除既有基础能力、标准库/密码学及 [Osprey 24 题](tests/bench/osprey/README.md) 外，还覆盖以下扩充专题：
 - 经典数据结构、流密码与编解码 5 题：`avl_tree`、`chacha20_stream`、`huffman_coding`、`json_tokenizer`、`lzw_codec`（各提供 5 语言端口）；
 - [PLB2 3 题](tests/bench/plb2/README.md)：`plb2_nqueen`、`plb2_sudoku`、`plb2_bedcov`（MIT 来源，5 语言端口）；
 - 并发调度 2 题：`thread_ring`（Go / Rust）、`skynet`（Go）；
 - [SciMark2 5 题](tests/bench/scimark2/README.md)：`scimark_montecarlo`、`scimark_sor`、`scimark_lu`、`scimark_sparse`、`scimark_fft`（NIST 数值计算核，5 语言端口；Unix C 自动附加 `-lm`）；
-- [AWFY 与进阶 8 题](tests/bench/awfy/README.md)：`awfy_richards`、`awfy_json_parser`、`brainfuck_vm`、`regex_nfa`、`treap_ops`、`astar_maze`、`levenshtein_dp`、`csv_aggregate`（5 语言端口）。
+- [AWFY 与进阶 8 题](tests/bench/awfy/README.md)：`awfy_richards`、`awfy_json_parser`、`brainfuck_vm`、`regex_nfa`、`treap_ops`、`astar_maze`、`levenshtein_dp`、`csv_aggregate`（5 语言端口）；
+- [Web 后端、网络协议与序列化 6 题](tests/bench/web_proto/README.md)：`http_router_parse`、`websocket_frame`、`protobuf_varint`、`toml_config_parse`、`template_render`、`hmac_pbkdf2`（5 语言端口）；
+- [数据库与存储检索 6 题](tests/bench/storage/README.md)：`btree_index`、`lsm_compaction`、`bm25_search`、`sql_query_exec`、`consistent_hash`、`wal_log_recovery`（5 语言端口）；
+- [系统编程与工具链 6 题](tests/bench/systems/README.md)：`expr_bytecode_vm`、`myers_diff`、`slab_allocator`、`timing_wheel`、`lz4_block_codec`、`utf8_text_norm`（5 语言端口）；
+- [图形物理、AI/量化、现代密码与并发流水线 8 题](tests/bench/graphics_ai/README.md)：`raytrace_sphere`、`image_sobel_blur`、`physics_collision`、`mlp_inference`、`kmeans_cluster`、`order_book_match`、`x25519_dh`（5 语言端口），以及 `parallel_mapreduce`（Go / Rust）。
 [Osprey 24 题](tests/bench/osprey/README.md) 保持上游原始工作量与 MIT 来源，各题提供 Xu / Go / C / Rust / Swift 端口；C 主机横测在缺少 Clang 时使用 GCC。
 
 `http_concurrent` 使用 16 个 worker，各执行 200 次自环回 HTTP 请求。
 每次请求建立新 TCP 连接，校验响应正文和固定校验和；Xu、Go、Rust 提供对照实现。
 Go 使用 `net/http`，Rust 使用标准库线程与最小 HTTP 服务，结果包含连接、调度和协议开销。
-Xu 0.12.4 的六平台历史横测包含该负载及其 Go、Rust 对照（当时共 72 项负载，现已扩充至 95 项）。
+Xu 0.12.4 的六平台历史横测包含该负载及其 Go、Rust 对照（当时共 72 项负载，现已扩充至 121 项）。
 [Actions 实测记录](https://github.com/xulang-org/bench/actions/runs/43736137952)
 Windows 的临时 TCP 端口会被 `TIME_WAIT` 保留。每次启动该负载前，工具读取实际 IPv4
 动态端口范围与 TCP 表，等待足够容纳 3200 次新连接及 1024 个余量；各语言使用同一准入
