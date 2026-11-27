@@ -46,6 +46,7 @@ from bench_crosslang import (  # noqa: E402
     median,
     parse_benches,
     peer_sources,
+    swift_link_flags,
     ver_line,
     xu_src,
 )
@@ -254,7 +255,7 @@ def swiftc_compile_argv(swiftc: str, src: Path, opt: int, out: Path) -> list[str
     # the temporary binaries and include shared software AES sources.
     sources = [str(src), *peer_sources(src.stem, "swift")[1:]]
     return [swiftc, "-module-cache-path", str(out.parent / "swift-module-cache"),
-            flag, "-o", str(out), *sources]
+            flag, "-o", str(out), *sources, *swift_link_flags()]
 
 
 def ensure_xupath() -> None:
