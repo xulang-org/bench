@@ -1,0 +1,285 @@
+@main
+
+struct JsonParser {
+    pub pos int
+    pub n int
+    pub kind []int
+    pub val []int
+    pub first_child []int
+    pub next_sib []int
+}
+
+fn push_str(buf $&[]int, s string) {
+    $i := 0
+    while i < s.len {
+        buf.push(s[i] & 255)
+        i += 1
+    }
+}
+
+fn push_int(buf $&[]int, v int) {
+    $x := v
+    if x < 0 {
+        buf.push(45)
+        x = -x
+    }
+    if x == 0 {
+        buf.push(48)
+        <<
+    }
+    $digs := []int{}
+    while x > 0 {
+        digs.push(48 + (x % 10))
+        x /= 10
+    }
+    $i := digs.len - 1
+    while i >= 0 {
+        buf.push(digs[i])
+        i -= 1
+    }
+}
+
+fn build_json_payload() []int {
+    $buf := []int{}
+    push_str($&buf, "{\"meta\":{\"id\":1000,\"active\":true,\"deleted\":false,\"note\":null,\"ratio\":-12.375e2},\"records\":[")
+    $r := 0
+    while r < 48 {
+        if r > 0 {
+            buf.push(44)
+        }
+        v0 := (r * 37 + 11) % 997 - 400
+        v1 := (r * 53 + 7) % 503
+        v2 := -(r * 19 + 3)
+        v3 := r * 7 + 1
+        push_str($&buf, "{\"id\":")
+        push_int($&buf, r)
+        push_str($&buf, ",\"name\":\"item_")
+        push_int($&buf, r)
+        buf.push(92)
+        buf.push(34)
+        buf.push(118)
+        buf.push(92)
+        buf.push(92)
+        buf.push(110)
+        buf.push(34)
+        if r % 2 == 0 {
+            push_str($&buf, ",\"ok\":true,\"err\":null,\"vals\":[")
+        } else {
+            push_str($&buf, ",\"ok\":false,\"err\":null,\"vals\":[")
+        }
+        push_int($&buf, v0)
+        buf.push(44)
+        push_int($&buf, v1)
+        buf.push(46)
+        buf.push(48 + (r % 10))
+        buf.push(44)
+        push_int($&buf, v2)
+        push_str($&buf, "e1,")
+        push_int($&buf, v3)
+        push_str($&buf, "],\"cfg\":{\"a\":")
+        push_int($&buf, r * 3 + 1)
+        push_str($&buf, ",\"b\":\"tag_")
+        buf.push(48 + (r % 7))
+        push_str($&buf, "\",\"c\":[true,false,null]}}")
+        r += 1
+    }
+    push_str($&buf, "]}")
+    << buf
+}
+
+fn new_node(p $&JsonParser, k int, v int) int {
+    idx := p.kind.len
+    p.kind.push(k)
+    p.val.push(v)
+    p.first_child.push(-1)
+    p.next_sib.push(-1)
+    << idx
+}
+
+fn skip_ws(p $&JsonParser, buf &[]int) {
+    while p.pos < p.n {
+        c := buf[p.pos]
+        if c == 32 || c == 9 || c == 10 || c == 13 {
+            p.pos += 1
+        } else {
+            <-
+        }
+    }
+}
+
+fn parse_string_hash(p $&JsonParser, buf &[]int) int {
+    p.pos += 1
+    $h := 0
+    while p.pos < p.n {
+        c := buf[p.pos]
+        p.pos += 1
+        if c == 34 {
+            << h
+        }
+        if c == 92 {
+            if p.pos < p.n {
+                ec := buf[p.pos]
+                p.pos += 1
+                h = (h * 131 + ec + 256) % 1000000007
+            }
+        } else {
+            h = (h * 131 + c) % 1000000007
+        }
+    }
+    << h
+}
+
+fn parse_number_hash(p $&JsonParser, buf &[]int) int {
+    $h := 0
+    if p.pos < p.n && buf[p.pos] == 45 {
+        h = 45
+        p.pos += 1
+    }
+    while p.pos < p.n && buf[p.pos] >= 48 && buf[p.pos] <= 57 {
+        h = (h * 131 + buf[p.pos]) % 1000000007
+        p.pos += 1
+    }
+    if p.pos < p.n && buf[p.pos] == 46 {
+        h = (h * 131 + 46) % 1000000007
+        p.pos += 1
+        while p.pos < p.n && buf[p.pos] >= 48 && buf[p.pos] <= 57 {
+            h = (h * 131 + buf[p.pos]) % 1000000007
+            p.pos += 1
+        }
+    }
+    if p.pos < p.n && (buf[p.pos] == 101 || buf[p.pos] == 69) {
+        h = (h * 131 + 101) % 1000000007
+        p.pos += 1
+        if p.pos < p.n && (buf[p.pos] == 43 || buf[p.pos] == 45) {
+            h = (h * 131 + buf[p.pos]) % 1000000007
+            p.pos += 1
+        }
+        while p.pos < p.n && buf[p.pos] >= 48 && buf[p.pos] <= 57 {
+            h = (h * 131 + buf[p.pos]) % 1000000007
+            p.pos += 1
+        }
+    }
+    << h
+}
+
+fn parse_val(p $&JsonParser, buf &[]int) int {
+    skip_ws(p, buf)
+    c := buf[p.pos]
+    if c == 123 {
+        p.pos += 1
+        node := new_node(p, 6, 0)
+        skip_ws(p, buf)
+        if p.pos < p.n && buf[p.pos] == 125 {
+            p.pos += 1
+            << node
+        }
+        $tail := -1
+        $cnt := 0
+        while p.pos < p.n {
+            skip_ws(p, buf)
+            kh := parse_string_hash(p, buf)
+            skip_ws(p, buf)
+            p.pos += 1
+            child := parse_val(p, buf)
+            p.val[node] = (p.val[node] * 31 + kh) % 1000000007
+            if tail == -1 {
+                p.first_child[node] = child
+            } else {
+                p.next_sib[tail] = child
+            }
+            tail = child
+            cnt += 1
+            skip_ws(p, buf)
+            if p.pos < p.n && buf[p.pos] == 44 {
+                p.pos += 1
+            } else {
+                p.pos += 1
+                <-
+            }
+        }
+        p.val[node] = (p.val[node] * 31 + cnt) % 1000000007
+        << node
+    } else if c == 91 {
+        p.pos += 1
+        node := new_node(p, 5, 0)
+        skip_ws(p, buf)
+        if p.pos < p.n && buf[p.pos] == 93 {
+            p.pos += 1
+            << node
+        }
+        $tail := -1
+        $cnt := 0
+        while p.pos < p.n {
+            child := parse_val(p, buf)
+            if tail == -1 {
+                p.first_child[node] = child
+            } else {
+                p.next_sib[tail] = child
+            }
+            tail = child
+            cnt += 1
+            skip_ws(p, buf)
+            if p.pos < p.n && buf[p.pos] == 44 {
+                p.pos += 1
+            } else {
+                p.pos += 1
+                <-
+            }
+        }
+        p.val[node] = cnt
+        << node
+    } else if c == 34 {
+        << new_node(p, 4, parse_string_hash(p, buf))
+    } else if c == 116 {
+        p.pos += 4
+        << new_node(p, 2, 1)
+    } else if c == 102 {
+        p.pos += 5
+        << new_node(p, 2, 0)
+    } else if c == 110 {
+        p.pos += 4
+        << new_node(p, 1, 0)
+    } else {
+        << new_node(p, 3, parse_number_hash(p, buf))
+    }
+}
+
+fn walk(p $&JsonParser, u int) int {
+    $h := (p.kind[u] * 1000003 + p.val[u]) % 1000000007
+    $ch := p.first_child[u]
+    while ch != -1 {
+        h = (h * 31 + walk(p, ch)) % 1000000007
+        ch = p.next_sib[ch]
+    }
+    << h
+}
+
+fn main() int {
+    $buf := build_json_payload()
+    n := buf.len
+    $tot_nodes := 0
+    $tot_hash := 0
+    $r := 0
+    while r < 400 {
+        v := 1000 + r
+        buf[14] = 48 + (v / 1000) % 10
+        buf[15] = 48 + (v / 100) % 10
+        buf[16] = 48 + (v / 10) % 10
+        buf[17] = 48 + v % 10
+        $p := JsonParser{
+            pos: 0,
+            n: n,
+            kind: []int{},
+            val: []int{},
+            first_child: []int{},
+            next_sib: []int{}
+        }
+        root := parse_val($&p, &buf)
+        tot_nodes += p.kind.len
+        tot_hash = (tot_hash + walk($&p, root)) % 1000000007
+        r += 1
+    }
+    println(tot_nodes)
+    println(tot_hash)
+    << 0
+}

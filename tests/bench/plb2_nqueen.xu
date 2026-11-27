@@ -1,0 +1,44 @@
+@main
+
+fn nq_solve(n int) int {
+    $l := []int{}
+    $c := []int{}
+    $r := []int{}
+    $m := []int{}
+    $i := 0
+    while i < 32 {
+        l.push(0)
+        c.push(0)
+        r.push(0)
+        m.push(0)
+        i += 1
+    }
+    y0 := (1 << n) - 1
+    $k := 0
+    m[0] = y0
+    $cnt := 0
+    while k >= 0 {
+        y := m[k]
+        if y == 0 {
+            k -= 1
+        } else {
+            z := y & (0 - y)
+            m[k] = y - z
+            if k == n - 1 {
+                cnt += 1
+            } else {
+                k += 1
+                l[k] = ((l[k - 1] | z) << 1) & y0
+                c[k] = c[k - 1] | z
+                r[k] = (r[k - 1] | z) >> 1
+                m[k] = y0 ^ (l[k] | c[k] | r[k])
+            }
+        }
+    }
+    << cnt
+}
+
+fn main() int {
+    println(nq_solve(15))
+    << 0
+}

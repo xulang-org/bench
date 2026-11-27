@@ -1,0 +1,142 @@
+@main
+
+#math
+
+fn main() int {
+    d0 := 64
+    d1 := 128
+    d2 := 64
+    d3 := 16
+    $rng := 73737373
+
+    $w1 := []f64{}
+    $b1 := []f64{}
+    $w2 := []f64{}
+    $b2 := []f64{}
+    $w3 := []f64{}
+    $b3 := []f64{}
+
+    $k := 0
+    while k < d1 * d0 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        w1.push(f64((rng % 255) - 127) / 1024.0)
+        k += 1
+    }
+    k = 0
+    while k < d1 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        b1.push(f64((rng % 63) - 31) / 256.0)
+        k += 1
+    }
+    k = 0
+    while k < d2 * d1 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        w2.push(f64((rng % 255) - 127) / 1024.0)
+        k += 1
+    }
+    k = 0
+    while k < d2 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        b2.push(f64((rng % 63) - 31) / 256.0)
+        k += 1
+    }
+    k = 0
+    while k < d3 * d2 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        w3.push(f64((rng % 255) - 127) / 1024.0)
+        k += 1
+    }
+    k = 0
+    while k < d3 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        b3.push(f64((rng % 63) - 31) / 256.0)
+        k += 1
+    }
+
+    $x := []f64{}
+    $h1 := []f64{}
+    $h2 := []f64{}
+    k = 0
+    while k < d0 {
+        x.push(0.0)
+        k += 1
+    }
+    k = 0
+    while k < d1 {
+        h1.push(0.0)
+        k += 1
+    }
+    k = 0
+    while k < d2 {
+        h2.push(0.0)
+        k += 1
+    }
+
+    $cls_sum := 0
+    $logit_acc := 0.0
+    $smp := 0
+    while smp < 2000 {
+        $i := 0
+        while i < d0 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            x[i] = f64((rng % 255) - 127) / 128.0
+            i += 1
+        }
+        $j := 0
+        while j < d1 {
+            $s := b1[j]
+            base := j * d0
+            i = 0
+            while i < d0 {
+                s += x[i] * w1[base + i]
+                i += 1
+            }
+            if s > 0.0 {
+                h1[j] = s
+            } else {
+                h1[j] = 0.0
+            }
+            j += 1
+        }
+        j = 0
+        while j < d2 {
+            $s := b2[j]
+            base := j * d1
+            i = 0
+            while i < d1 {
+                s += h1[i] * w2[base + i]
+                i += 1
+            }
+            if s > 0.0 {
+                h2[j] = s
+            } else {
+                h2[j] = 0.0
+            }
+            j += 1
+        }
+        $best_c := 0
+        $best_v := -1.0e18
+        j = 0
+        while j < d3 {
+            $s := b3[j]
+            base := j * d2
+            i = 0
+            while i < d2 {
+                s += h2[i] * w3[base + i]
+                i += 1
+            }
+            if s > best_v {
+                best_v = s
+                best_c = j
+            }
+            j += 1
+        }
+        cls_sum += best_c
+        logit_acc += math.abs(best_v)
+        smp += 1
+    }
+
+    println(cls_sum)
+    println(int(math.floor(logit_acc * 10.0 + 0.5)))
+    << 0
+}

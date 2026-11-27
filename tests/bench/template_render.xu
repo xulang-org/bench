@@ -1,0 +1,311 @@
+@main
+
+fn to_bytes(s string) []int {
+    $b := []int{}
+    $i := 0
+    while i < s.len {
+        b.push(s[i] & 255)
+        i += 1
+    }
+    << b
+}
+
+fn emit_raw(out $&[]int, s &[]int, start int, ln int) {
+    $i := 0
+    while i < ln {
+        out.push(s[start + i])
+        i += 1
+    }
+}
+
+fn emit_esc(out $&[]int, s &[]int) {
+    $i := 0
+    n := s.len
+    while i < n {
+        ch := s[i]
+        if ch == 38 {
+            out.push(38)
+            out.push(97)
+            out.push(109)
+            out.push(112)
+            out.push(59)
+        } else if ch == 60 {
+            out.push(38)
+            out.push(108)
+            out.push(116)
+            out.push(59)
+        } else if ch == 62 {
+            out.push(38)
+            out.push(103)
+            out.push(116)
+            out.push(59)
+        } else if ch == 34 {
+            out.push(38)
+            out.push(113)
+            out.push(117)
+            out.push(111)
+            out.push(116)
+            out.push(59)
+        } else if ch == 39 {
+            out.push(38)
+            out.push(35)
+            out.push(51)
+            out.push(57)
+            out.push(59)
+        } else {
+            out.push(ch)
+        }
+        i += 1
+    }
+}
+
+fn match_bytes(src &[]int, s int, e int, pat string) bool {
+    $a := s
+    $b := e
+    while a < b && (src[a] == 32 || src[a] == 9) {
+        a += 1
+    }
+    while b > a && (src[b - 1] == 32 || src[b - 1] == 9) {
+        b -= 1
+    }
+    if b - a != pat.len {
+        << false
+    }
+    $i := 0
+    while i < pat.len {
+        if src[a + i] != (pat[i] & 255) {
+            << false
+        }
+        i += 1
+    }
+    << true
+}
+
+fn var_id(src &[]int, s int, e int) int {
+    if match_bytes(src, s, e, "title") { << 0 }
+    if match_bytes(src, s, e, "badge") { << 1 }
+    if match_bytes(src, s, e, "name") { << 2 }
+    if match_bytes(src, s, e, "desc") { << 3 }
+    << -1
+}
+
+fn main() int {
+    mod_v := 1000000007
+    tmpl := to_bytes("<div class=\"card\"><h1>{{title}}</h1>{{{badge}}}<ul>{%for item%}<li class=\"{%if featured%}hot{%else%}std{%endif%}\"><span>{{name}}</span><em>{{desc}}</em></li>{%endfor%}</ul></div>")
+    tlen := tmpl.len
+
+    $titles := [][]int{}
+    titles.push(to_bytes("Xu <Fast> & Safe"))
+    titles.push(to_bytes("Bench \"Suite\" 'v1'"))
+    titles.push(to_bytes("Release & Notes <2026>"))
+    titles.push(to_bytes("Core / Engine"))
+
+    $badges := [][]int{}
+    badges.push(to_bytes("<b>PRO</b>"))
+    badges.push(to_bytes("<i>LTS</i>"))
+    badges.push(to_bytes("<span>NEW</span>"))
+    badges.push(to_bytes("<b>OK</b>"))
+
+    $names := [][]int{}
+    names.push(to_bytes("Item <alpha> & 1"))
+    names.push(to_bytes("Widget \"beta\""))
+    names.push(to_bytes("Node 'gamma' > 0"))
+    names.push(to_bytes("Cache & Pool"))
+    names.push(to_bytes("Router <v2>"))
+    names.push(to_bytes("Codec \"lz4\""))
+    names.push(to_bytes("Parser 'ast'"))
+    names.push(to_bytes("Engine <core>"))
+
+    $descs := [][]int{}
+    descs.push(to_bytes("a < b && c > d"))
+    descs.push(to_bytes("quote \"here\" & 'there'"))
+    descs.push(to_bytes("plain fast path"))
+    descs.push(to_bytes("x & y < z"))
+
+    $op_kind := []int{}
+    $op_a := []int{}
+    $op_b := []int{}
+    $for_stack := []int{}
+    $if_stack := []int{}
+    $else_stack := []int{}
+    $si := 0
+    while si < 8 {
+        for_stack.push(0)
+        if_stack.push(0)
+        else_stack.push(0)
+        si += 1
+    }
+    $out := []int{}
+
+    $total_bytes := 0
+    $ck := 0
+    $rnd := 0
+    while rnd < 400 {
+        op_kind = []int{}
+        op_a = []int{}
+        op_b = []int{}
+        $for_sp := 0
+        $if_sp := 0
+        $pos := 0
+        while pos < tlen {
+            $np := pos
+            while np + 1 < tlen && !(tmpl[np] == 123 && (tmpl[np + 1] == 123 || tmpl[np + 1] == 37)) {
+                np += 1
+            }
+            if np + 1 >= tlen {
+                np = tlen
+            }
+            if np > pos {
+                op_kind.push(0)
+                op_a.push(pos)
+                op_b.push(np - pos)
+                pos = np
+            }
+            if pos >= tlen {
+                <-
+            }
+            if tmpl[pos + 1] == 123 {
+                if pos + 2 < tlen && tmpl[pos + 2] == 123 {
+                    $end := pos + 3
+                    while !(tmpl[end] == 125 && tmpl[end + 1] == 125 && tmpl[end + 2] == 125) {
+                        end += 1
+                    }
+                    op_kind.push(2)
+                    op_a.push(var_id(&tmpl, pos + 3, end))
+                    op_b.push(0)
+                    pos = end + 3
+                } else {
+                    $end := pos + 2
+                    while !(tmpl[end] == 125 && tmpl[end + 1] == 125) {
+                        end += 1
+                    }
+                    op_kind.push(1)
+                    op_a.push(var_id(&tmpl, pos + 2, end))
+                    op_b.push(0)
+                    pos = end + 2
+                }
+            } else {
+                $end := pos + 2
+                while !(tmpl[end] == 37 && tmpl[end + 1] == 125) {
+                    end += 1
+                }
+                ts := pos + 2
+                if match_bytes(&tmpl, ts, end, "for item") {
+                    for_stack[for_sp] = op_kind.len
+                    for_sp += 1
+                    op_kind.push(3)
+                    op_a.push(0)
+                    op_b.push(0)
+                } else if match_bytes(&tmpl, ts, end, "endfor") {
+                    for_sp -= 1
+                    fidx := for_stack[for_sp]
+                    op_kind.push(4)
+                    op_a.push(fidx + 1)
+                    op_b.push(0)
+                    op_a[fidx] = op_kind.len
+                } else if match_bytes(&tmpl, ts, end, "if featured") {
+                    if_stack[if_sp] = op_kind.len
+                    else_stack[if_sp] = -1
+                    if_sp += 1
+                    op_kind.push(5)
+                    op_a.push(0)
+                    op_b.push(0)
+                } else if match_bytes(&tmpl, ts, end, "else") {
+                    eidx := op_kind.len
+                    op_kind.push(6)
+                    op_a.push(0)
+                    op_b.push(0)
+                    iidx := if_stack[if_sp - 1]
+                    op_a[iidx] = eidx + 1
+                    else_stack[if_sp - 1] = eidx
+                } else if match_bytes(&tmpl, ts, end, "endif") {
+                    if_sp -= 1
+                    iidx := if_stack[if_sp]
+                    eidx := else_stack[if_sp]
+                    if eidx >= 0 {
+                        op_a[eidx] = op_kind.len
+                    } else {
+                        op_a[iidx] = op_kind.len
+                    }
+                    op_kind.push(7)
+                    op_a.push(0)
+                    op_b.push(0)
+                }
+                pos = end + 2
+            }
+        }
+
+        n_ops := op_kind.len
+        $page := 0
+        while page < 25 {
+            out = []int{}
+            $pc := 0
+            $item_idx := 0
+            item_cnt := 12
+            while pc < n_ops {
+                op := op_kind[pc]
+                a := op_a[pc]
+                if op == 0 {
+                    emit_raw($&out, &tmpl, a, op_b[pc])
+                    pc += 1
+                } else if op == 1 {
+                    if a == 0 {
+                        ti := (rnd + page) & 3
+                        emit_esc($&out, &titles[ti])
+                    } else if a == 2 {
+                        ni := (page + item_idx + rnd) & 7
+                        emit_esc($&out, &names[ni])
+                    } else if a == 3 {
+                        di := (page * 3 + item_idx + rnd) & 3
+                        emit_esc($&out, &descs[di])
+                    }
+                    pc += 1
+                } else if op == 2 {
+                    if a == 1 {
+                        bi := (rnd * 3 + page) & 3
+                        emit_raw($&out, &badges[bi], 0, badges[bi].len)
+                    }
+                    pc += 1
+                } else if op == 3 {
+                    if item_cnt == 0 {
+                        pc = a
+                    } else {
+                        item_idx = 0
+                        pc += 1
+                    }
+                } else if op == 4 {
+                    item_idx += 1
+                    if item_idx < item_cnt {
+                        pc = a
+                    } else {
+                        pc += 1
+                    }
+                } else if op == 5 {
+                    if ((rnd + page + item_idx) % 3) == 0 {
+                        pc += 1
+                    } else {
+                        pc = a
+                    }
+                } else if op == 6 {
+                    pc = a
+                } else {
+                    pc += 1
+                }
+            }
+            total_bytes += out.len
+            $h := 0
+            $oi := 0
+            olen := out.len
+            while oi < olen {
+                h = (h * 131 + out[oi]) % mod_v
+                oi += 1
+            }
+            ck = (ck * 31 + h) % mod_v
+            page += 1
+        }
+        rnd += 1
+    }
+    println(total_bytes)
+    println(ck)
+    << 0
+}

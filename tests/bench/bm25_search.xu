@@ -1,0 +1,252 @@
+@main
+
+fn ilog2_x1000(x int, lut &[]int) int {
+    $b := 0
+    $t := x
+    while t >= 2 {
+        t = t >> 1
+        b += 1
+    }
+    frac := ((x - (1 << b)) << 4) >> b
+    << b * 1000 + lut[frac]
+}
+
+fn main() int {
+    mod_v := 1000000007
+    n_docs := 6000
+    vocab := 2048
+    $rng := 777654321
+
+    $lut := []int{}
+    lut.push(0)
+    lut.push(87)
+    lut.push(170)
+    lut.push(248)
+    lut.push(322)
+    lut.push(392)
+    lut.push(459)
+    lut.push(524)
+    lut.push(585)
+    lut.push(644)
+    lut.push(700)
+    lut.push(755)
+    lut.push(807)
+    lut.push(858)
+    lut.push(907)
+    lut.push(954)
+
+    $doc_len := []int{}
+    $scores := []int{}
+    $stamp := []int{}
+    $touched := []int{}
+    $d := 0
+    while d < n_docs {
+        doc_len.push(0)
+        scores.push(0)
+        stamp.push(0)
+        touched.push(0)
+        d += 1
+    }
+
+    $df := []int{}
+    $post_off := []int{}
+    $cur := []int{}
+    $idf := []int{}
+    $t := 0
+    while t < vocab {
+        df.push(0)
+        post_off.push(0)
+        cur.push(0)
+        idf.push(0)
+        t += 1
+    }
+    post_off.push(0)
+
+    $raw_d := []int{}
+    $raw_t := []int{}
+    $raw_f := []int{}
+    $tmp := []int{}
+    $k := 0
+    while k < 64 {
+        tmp.push(0)
+        k += 1
+    }
+
+    $total_len := 0
+    d = 0
+    while d < n_docs {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        dl := 24 + (rng % 32)
+        doc_len[d] = dl
+        total_len += dl
+        $j := 0
+        while j < dl {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            $term := 0
+            if (rng % 3) == 0 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                term = rng % 64
+            } else {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                term = 64 + (rng % (vocab - 64))
+            }
+            tmp[j] = term
+            j += 1
+        }
+        j = 1
+        while j < dl {
+            key := tmp[j]
+            $p := j - 1
+            while p >= 0 && tmp[p] > key {
+                tmp[p + 1] = tmp[p]
+                p -= 1
+            }
+            tmp[p + 1] = key
+            j += 1
+        }
+        j = 0
+        while j < dl {
+            term := tmp[j]
+            $cnt := 1
+            while j + cnt < dl && tmp[j + cnt] == term {
+                cnt += 1
+            }
+            df[term] += 1
+            raw_d.push(d)
+            raw_t.push(term)
+            raw_f.push(cnt)
+            j += cnt
+        }
+        d += 1
+    }
+
+    t = 0
+    while t < vocab {
+        post_off[t + 1] = post_off[t] + df[t]
+        cur[t] = post_off[t]
+        t += 1
+    }
+    total_p := post_off[vocab]
+    $post_doc := []int{}
+    $post_tf := []int{}
+    $i := 0
+    while i < total_p {
+        post_doc.push(0)
+        post_tf.push(0)
+        i += 1
+    }
+    i = 0
+    while i < raw_d.len {
+        term := raw_t[i]
+        idx := cur[term]
+        post_doc[idx] = raw_d[i]
+        post_tf[idx] = raw_f[i]
+        cur[term] = idx + 1
+        i += 1
+    }
+
+    t = 0
+    while t < vocab {
+        if df[t] > 0 {
+            ratio_x1024 := (((n_docs - df[t]) * 2 + 1) * 1024) / (df[t] * 2 + 1) + 1024
+            idf[t] = ilog2_x1000(ratio_x1024, &lut) - 10000
+        }
+        t += 1
+    }
+
+    avgdl_x100 := (total_len * 100) / n_docs
+    $dl_norm := []int{}
+    d = 0
+    while d < n_docs {
+        dl_norm.push(250 + (750 * doc_len[d] * 100) / avgdl_x100)
+        d += 1
+    }
+
+    $qterms := []int{}
+    i = 0
+    while i < 5 {
+        qterms.push(0)
+        i += 1
+    }
+    $top_d := []int{}
+    $top_s := []int{}
+    i = 0
+    while i < 10 {
+        top_d.push(0)
+        top_s.push(0)
+        i += 1
+    }
+
+    $total_hits := 0
+    $ck := 0
+    $q := 1
+    while q <= 2000 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        qn := 3 + (rng % 3)
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        qterms[0] = rng % 64
+        $j := 1
+        while j < qn {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            qterms[j] = 64 + (rng % (vocab - 64))
+            j += 1
+        }
+        $t_cnt := 0
+        j = 0
+        while j < qn {
+            term := qterms[j]
+            it := idf[term]
+            if it > 0 {
+                $p := post_off[term]
+                pend := post_off[term + 1]
+                while p < pend {
+                    doc_i := post_doc[p]
+                    tf := post_tf[p]
+                    sc := (it * tf * 2200) / (tf * 1000 + (12 * dl_norm[doc_i]) / 10)
+                    if stamp[doc_i] != q {
+                        stamp[doc_i] = q
+                        scores[doc_i] = sc
+                        touched[t_cnt] = doc_i
+                        t_cnt += 1
+                    } else {
+                        scores[doc_i] += sc
+                    }
+                    p += 1
+                }
+            }
+            j += 1
+        }
+        $k_found := 0
+        i = 0
+        while i < t_cnt {
+            doc_i := touched[i]
+            s := scores[doc_i]
+            if k_found < 10 || s > top_s[9] || (s == top_s[9] && doc_i < top_d[9]) {
+                $pos := 9
+                if k_found < 10 {
+                    pos = k_found
+                    k_found += 1
+                }
+                while pos > 0 && (s > top_s[pos - 1] || (s == top_s[pos - 1] && doc_i < top_d[pos - 1])) {
+                    top_s[pos] = top_s[pos - 1]
+                    top_d[pos] = top_d[pos - 1]
+                    pos -= 1
+                }
+                top_s[pos] = s
+                top_d[pos] = doc_i
+            }
+            i += 1
+        }
+        total_hits += k_found
+        $r := 0
+        while r < k_found {
+            ck = (ck * 31 + top_d[r] * 10007 + top_s[r]) % mod_v
+            r += 1
+        }
+        q += 1
+    }
+
+    println(total_hits)
+    println(ck)
+    << 0
+}

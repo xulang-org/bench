@@ -41,6 +41,7 @@ from bench_crosslang import (  # noqa: E402
     COMPILE_ITERS,
     RunStats,
     _curve_slug,
+    c_link_flags,
     cross_src,
     median,
     parse_benches,
@@ -72,7 +73,7 @@ INITIAL_TIMEOUT_S = 60.0
 # Short-bench wall ≫ in-process CPU: leftover lifecycle wait (was ~50ms poll).
 WALL_OVER_CPU_S = 0.040
 SHORT_CPU_S = 0.040
-WALL_CPU_SKIP = frozenset({"chan_ping"})
+WALL_CPU_SKIP = frozenset({"chan_ping", "http_concurrent", "thread_ring", "skynet"})
 
 
 def opt_label(opt: int, impl: str) -> str:
@@ -233,7 +234,7 @@ def xu_compile_argv(compiler: Path, src: Path, opt: int, out: Path,
 
 
 def clang_compile_argv(clang: str, src: Path, opt: int, out: Path) -> list[str]:
-    return [clang, f"-O{opt}", "-o", str(out), str(src)]
+    return [clang, f"-O{opt}", "-o", str(out), str(src), *c_link_flags()]
 
 
 def go_compile_argv(go: str, src: Path, opt: int, out: Path) -> list[str]:

@@ -1,0 +1,35 @@
+@main
+
+fn skynet(ch chan int, num int, size int, div int) {
+    if size == 1 {
+        ch <- num
+        <<
+    }
+    sub_size := size / div
+    sub := chan int{cap: div}
+    $i := 0
+    while i < div {
+        xu skynet(sub, num + i * sub_size, sub_size, div)
+        i += 1
+    }
+    $sum := 0
+    i = 0
+    while i < div {
+        sum += <-sub
+        i += 1
+    }
+    ch <- sum
+}
+
+fn main() int {
+    $total := 0
+    $r := 0
+    while r < 2 {
+        ch := chan int{cap: 1}
+        xu skynet(ch, 0, 1000, 10)
+        total += <-ch
+        r += 1
+    }
+    println(total)
+    << 0
+}

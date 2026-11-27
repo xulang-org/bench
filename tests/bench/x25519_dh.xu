@@ -1,0 +1,338 @@
+@main
+
+#strings
+
+fn make16() []int {
+    $v := []int{}
+    $i := 0
+    while i < 16 {
+        v.push(0)
+        i += 1
+    }
+    << v
+}
+
+fn copy16(dst $&[]int, src &[]int) {
+    $i := 0
+    while i < 16 {
+        dst[i] = src[i]
+        i += 1
+    }
+}
+
+fn car25519(o $&[]int) {
+    $i := 0
+    while i < 16 {
+        c := o[i] >> 16
+        o[i] = o[i] & 65535
+        if i < 15 {
+            o[i + 1] += c
+        } else {
+            o[0] += c * 38
+        }
+        i += 1
+    }
+}
+
+fn fadd_new(o $&[]int, a &[]int, b &[]int) {
+    $i := 0
+    while i < 16 {
+        o[i] = a[i] + b[i]
+        i += 1
+    }
+}
+
+fn fsub_new(o $&[]int, a &[]int, b &[]int) {
+    o[0] = a[0] + 130996 - b[0]
+    $i := 1
+    while i < 16 {
+        o[i] = a[i] + 131070 - b[i]
+        i += 1
+    }
+    car25519(o)
+}
+
+fn fsub_self(a $&[]int, b &[]int) {
+    a[0] = a[0] + 130996 - b[0]
+    $i := 1
+    while i < 16 {
+        a[i] = a[i] + 131070 - b[i]
+        i += 1
+    }
+    car25519(a)
+}
+
+fn fmul_core(o $&[]int, a &[]int, b &[]int, t $&[]int) {
+    $k := 0
+    while k < 32 {
+        t[k] = 0
+        k += 1
+    }
+    $i := 0
+    while i < 16 {
+        ai := a[i]
+        $j := 0
+        while j < 16 {
+            t[i + j] += ai * b[j]
+            j += 1
+        }
+        i += 1
+    }
+    i = 0
+    while i < 16 {
+        o[i] = t[i] + 38 * t[i + 16]
+        i += 1
+    }
+    car25519(o)
+    car25519(o)
+}
+
+fn fmul_self(a $&[]int, b &[]int, t $&[]int) {
+    $k := 0
+    while k < 32 {
+        t[k] = 0
+        k += 1
+    }
+    $i := 0
+    while i < 16 {
+        ai := a[i]
+        $j := 0
+        while j < 16 {
+            t[i + j] += ai * b[j]
+            j += 1
+        }
+        i += 1
+    }
+    i = 0
+    while i < 16 {
+        a[i] = t[i] + 38 * t[i + 16]
+        i += 1
+    }
+    car25519(a)
+    car25519(a)
+}
+
+fn fsq_self(a $&[]int, t $&[]int) {
+    $k := 0
+    while k < 32 {
+        t[k] = 0
+        k += 1
+    }
+    $i := 0
+    while i < 16 {
+        ai := a[i]
+        $j := 0
+        while j < 16 {
+            t[i + j] += ai * a[j]
+            j += 1
+        }
+        i += 1
+    }
+    i = 0
+    while i < 16 {
+        a[i] = t[i] + 38 * t[i + 16]
+        i += 1
+    }
+    car25519(a)
+    car25519(a)
+}
+
+fn fsq_new(o $&[]int, a &[]int, t $&[]int) {
+    fmul_core(o, a, a, t)
+}
+
+fn cswap(p $&[]int, q $&[]int, bit int) {
+    if bit != 0 {
+        $i := 0
+        while i < 16 {
+            tmp := p[i]
+            p[i] = q[i]
+            q[i] = tmp
+            i += 1
+        }
+    }
+}
+
+fn finv(o $&[]int, in_v &[]int, t $&[]int) {
+    $c := make16()
+    copy16($&c, in_v)
+    $a := 253
+    while a >= 0 {
+        fsq_self($&c, t)
+        if a != 2 && a != 4 {
+            fmul_self($&c, in_v, t)
+        }
+        a -= 1
+    }
+    copy16(o, &c)
+}
+
+fn pack25519(o $&[]int, n_in &[]int) {
+    $t := make16()
+    copy16($&t, n_in)
+    car25519($&t)
+    car25519($&t)
+    car25519($&t)
+    $m := make16()
+    $pass := 0
+    while pass < 2 {
+        m[0] = t[0] - 65517
+        $borrow := 0
+        if m[0] < 0 {
+            m[0] += 65536
+            borrow = 1
+        }
+        $i := 1
+        while i < 15 {
+            m[i] = t[i] - 65535 - borrow
+            if m[i] < 0 {
+                m[i] += 65536
+                borrow = 1
+            } else {
+                borrow = 0
+            }
+            i += 1
+        }
+        m[15] = t[15] - 32767 - borrow
+        if m[15] >= 0 {
+            copy16($&t, &m)
+        }
+        pass += 1
+    }
+    $i := 0
+    while i < 16 {
+        o[2 * i] = t[i] & 255
+        o[2 * i + 1] = (t[i] >> 8) & 255
+        i += 1
+    }
+}
+
+fn x25519(q $&[]int, n_bytes &[]int, p_bytes &[]int, a24 &[]int, t $&[]int) {
+    $z := []int{}
+    $i := 0
+    while i < 32 {
+        z.push(n_bytes[i])
+        i += 1
+    }
+    z[0] = z[0] & 248
+    z[31] = (z[31] & 127) | 64
+
+    $x := make16()
+    i = 0
+    while i < 16 {
+        x[i] = p_bytes[2 * i] | (p_bytes[2 * i + 1] << 8)
+        i += 1
+    }
+    x[15] = x[15] & 32767
+
+    $a := make16()
+    $b := make16()
+    $c := make16()
+    $d := make16()
+    $e := make16()
+    $f := make16()
+    a[0] = 1
+    copy16($&b, &x)
+    d[0] = 1
+
+    $bit_i := 254
+    while bit_i >= 0 {
+        r := (z[bit_i >> 3] >> (bit_i & 7)) & 1
+        cswap($&a, $&b, r)
+        cswap($&c, $&d, r)
+        fadd_new($&e, &a, &c)
+        fsub_self($&a, &c)
+        fadd_new($&c, &b, &d)
+        fsub_self($&b, &d)
+        fsq_new($&d, &e, t)
+        fsq_new($&f, &a, t)
+        fmul_self($&a, &c, t)
+        fmul_core($&c, &b, &e, t)
+        copy16($&e, &a)
+        $ii := 0
+        while ii < 16 {
+            e[ii] += c[ii]
+            ii += 1
+        }
+        fsub_self($&a, &c)
+        fsq_new($&b, &a, t)
+        fsub_new($&c, &d, &f)
+        fmul_core($&a, &c, a24, t)
+        ii = 0
+        while ii < 16 {
+            a[ii] += d[ii]
+            ii += 1
+        }
+        fmul_self($&c, &a, t)
+        fmul_core($&a, &d, &f, t)
+        fmul_core($&d, &b, &x, t)
+        fsq_new($&b, &e, t)
+        cswap($&a, $&b, r)
+        cswap($&c, $&d, r)
+        bit_i -= 1
+    }
+    copy16($&e, &c)
+    finv($&c, &e, t)
+    fmul_self($&a, &c, t)
+    pack25519(q, &a)
+}
+
+fn main() int {
+    $a24 := make16()
+    a24[0] = 56129
+    a24[1] = 1
+
+    $t := []int{}
+    $i := 0
+    while i < 32 {
+        t.push(0)
+        i += 1
+    }
+
+    $k := []int{}
+    $u := []int{}
+    $out := []int{}
+    i = 0
+    while i < 32 {
+        k.push(0)
+        u.push(0)
+        out.push(0)
+        i += 1
+    }
+    k[0] = 9
+    u[0] = 9
+
+    $step := 0
+    while step < 100 {
+        x25519($&out, &k, &u, &a24, $&t)
+        i = 0
+        while i < 32 {
+            u[i] = k[i]
+            k[i] = out[i]
+            i += 1
+        }
+        step += 1
+    }
+
+    println(100)
+    $hb := strings.builder()
+    i = 0
+    while i < 32 {
+        v := k[i]
+        h1 := (v >> 4) & 15
+        h2 := v & 15
+        if h1 < 10 {
+            hb.write_byte(48 + h1)
+        } else {
+            hb.write_byte(87 + h1)
+        }
+        if h2 < 10 {
+            hb.write_byte(48 + h2)
+        } else {
+            hb.write_byte(87 + h2)
+        }
+        i += 1
+    }
+    println(hb.text())
+    << 0
+}

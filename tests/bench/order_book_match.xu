@@ -1,0 +1,249 @@
+@main
+
+struct OrderBook {
+    pub b_head []int
+    pub b_tail []int
+    pub a_head []int
+    pub a_tail []int
+    pub o_side []int
+    pub o_px []int
+    pub o_qty []int
+    pub o_act []int
+    pub o_prev []int
+    pub o_next []int
+}
+
+fn new_book(pmax int, max_ord int) OrderBook {
+    $ob := OrderBook{
+        b_head: []int{},
+        b_tail: []int{},
+        a_head: []int{},
+        a_tail: []int{},
+        o_side: []int{},
+        o_px: []int{},
+        o_qty: []int{},
+        o_act: []int{},
+        o_prev: []int{},
+        o_next: []int{}
+    }
+    $i := 0
+    while i < pmax {
+        ob.b_head.push(-1)
+        ob.b_tail.push(-1)
+        ob.a_head.push(-1)
+        ob.a_tail.push(-1)
+        i += 1
+    }
+    i = 0
+    while i < max_ord {
+        ob.o_side.push(0)
+        ob.o_px.push(0)
+        ob.o_qty.push(0)
+        ob.o_act.push(0)
+        ob.o_prev.push(-1)
+        ob.o_next.push(-1)
+        i += 1
+    }
+    << ob
+}
+
+fn push_bid(ob $&OrderBook, px int, oid int) {
+    t := ob.b_tail[px]
+    ob.o_prev[oid] = t
+    ob.o_next[oid] = -1
+    if t != -1 {
+        ob.o_next[t] = oid
+    } else {
+        ob.b_head[px] = oid
+    }
+    ob.b_tail[px] = oid
+}
+
+fn push_ask(ob $&OrderBook, px int, oid int) {
+    t := ob.a_tail[px]
+    ob.o_prev[oid] = t
+    ob.o_next[oid] = -1
+    if t != -1 {
+        ob.o_next[t] = oid
+    } else {
+        ob.a_head[px] = oid
+    }
+    ob.a_tail[px] = oid
+}
+
+fn unlink_bid(ob $&OrderBook, px int, oid int) {
+    pr := ob.o_prev[oid]
+    nx := ob.o_next[oid]
+    if pr != -1 {
+        ob.o_next[pr] = nx
+    } else {
+        ob.b_head[px] = nx
+    }
+    if nx != -1 {
+        ob.o_prev[nx] = pr
+    } else {
+        ob.b_tail[px] = pr
+    }
+    ob.o_prev[oid] = -1
+    ob.o_next[oid] = -1
+}
+
+fn unlink_ask(ob $&OrderBook, px int, oid int) {
+    pr := ob.o_prev[oid]
+    nx := ob.o_next[oid]
+    if pr != -1 {
+        ob.o_next[pr] = nx
+    } else {
+        ob.a_head[px] = nx
+    }
+    if nx != -1 {
+        ob.o_prev[nx] = pr
+    } else {
+        ob.a_tail[px] = pr
+    }
+    ob.o_prev[oid] = -1
+    ob.o_next[oid] = -1
+}
+
+fn main() int {
+    mod_v := 1000000007
+    pmax := 2048
+    max_ord := 262144
+    $ob := new_book(pmax, max_ord)
+    $rng := 70707070
+
+    $best_bid := -1
+    $best_ask := pmax
+    $next_id := 0
+    $trades := 0
+    $cancels := 0
+    $ck := 0
+
+    $ev := 0
+    while ev < 250000 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        r := rng % 10
+        if r < 2 && next_id > 0 {
+            $win := next_id
+            if win > 4096 {
+                win = 4096
+            }
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            cid := next_id - 1 - (rng % win)
+            if ob.o_act[cid] == 1 {
+                px := ob.o_px[cid]
+                if ob.o_side[cid] == 0 {
+                    unlink_bid($&ob, px, cid)
+                    if px == best_bid && ob.b_head[px] == -1 {
+                        while best_bid >= 0 && ob.b_head[best_bid] == -1 {
+                            best_bid -= 1
+                        }
+                    }
+                } else {
+                    unlink_ask($&ob, px, cid)
+                    if px == best_ask && ob.a_head[px] == -1 {
+                        while best_ask < pmax && ob.a_head[best_ask] == -1 {
+                            best_ask += 1
+                        }
+                    }
+                }
+                ob.o_act[cid] = 0
+                cancels += 1
+            }
+        } else {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            side := (rng >> 16) & 1
+            $mid := 1024
+            if best_bid >= 0 && best_ask < pmax {
+                mid = (best_bid + best_ask) >> 1
+            } else if best_bid >= 0 {
+                mid = best_bid
+            } else if best_ask < pmax {
+                mid = best_ask
+            }
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            $px := mid + (rng % 41) - 20
+            if px < 1 {
+                px = 1
+            }
+            if px > pmax - 2 {
+                px = pmax - 2
+            }
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            $qty := 1 + (rng % 50)
+            if side == 0 {
+                while qty > 0 && best_ask <= px {
+                    oid := ob.a_head[best_ask]
+                    $fill := ob.o_qty[oid]
+                    if qty < fill {
+                        fill = qty
+                    }
+                    qty -= fill
+                    ob.o_qty[oid] -= fill
+                    trades += 1
+                    ck = (ck * 31 + fill * 1009 + best_ask) % mod_v
+                    if ob.o_qty[oid] == 0 {
+                        unlink_ask($&ob, best_ask, oid)
+                        ob.o_act[oid] = 0
+                        if ob.a_head[best_ask] == -1 {
+                            while best_ask < pmax && ob.a_head[best_ask] == -1 {
+                                best_ask += 1
+                            }
+                        }
+                    }
+                }
+                if qty > 0 {
+                    oid := next_id
+                    next_id += 1
+                    ob.o_side[oid] = 0
+                    ob.o_px[oid] = px
+                    ob.o_qty[oid] = qty
+                    ob.o_act[oid] = 1
+                    push_bid($&ob, px, oid)
+                    if px > best_bid {
+                        best_bid = px
+                    }
+                }
+            } else {
+                while qty > 0 && best_bid >= px {
+                    oid := ob.b_head[best_bid]
+                    $fill := ob.o_qty[oid]
+                    if qty < fill {
+                        fill = qty
+                    }
+                    qty -= fill
+                    ob.o_qty[oid] -= fill
+                    trades += 1
+                    ck = (ck * 31 + fill * 1009 + best_bid) % mod_v
+                    if ob.o_qty[oid] == 0 {
+                        unlink_bid($&ob, best_bid, oid)
+                        ob.o_act[oid] = 0
+                        if ob.b_head[best_bid] == -1 {
+                            while best_bid >= 0 && ob.b_head[best_bid] == -1 {
+                                best_bid -= 1
+                            }
+                        }
+                    }
+                }
+                if qty > 0 {
+                    oid := next_id
+                    next_id += 1
+                    ob.o_side[oid] = 1
+                    ob.o_px[oid] = px
+                    ob.o_qty[oid] = qty
+                    ob.o_act[oid] = 1
+                    push_ask($&ob, px, oid)
+                    if px < best_ask {
+                        best_ask = px
+                    }
+                }
+            }
+        }
+        ev += 1
+    }
+
+    ck = (ck * 37 + cancels * 17 + (best_bid + 1) * 7 + best_ask) % mod_v
+    println(trades)
+    println(ck)
+    << 0
+}

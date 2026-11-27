@@ -1,0 +1,108 @@
+@main
+
+fn main() int {
+    mod_v := 1000000007
+    w := 512
+    h := 512
+    total_px := w * h
+
+    $img := []int{}
+    $blur := []int{}
+    $edges := []int{}
+    $i := 0
+    while i < total_px {
+        img.push(0)
+        blur.push(0)
+        edges.push(0)
+        i += 1
+    }
+
+    $rng := 51515151
+    $y := 0
+    while y < h {
+        $x := 0
+        while x < w {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            $v := ((x * 3 + y * 5) >> 3) & 255
+            dx := x - 256
+            dy := y - 256
+            if dx * dx + dy * dy < 16384 {
+                v = (v + 110) & 255
+            }
+            if (x >= 80 && x < 200 && y >= 80 && y < 220) || (((x >> 5) + (y >> 5)) % 4) == 0 {
+                v = (v ^ 96) & 255
+            }
+            img[y * w + x] = (v + (rng & 15)) & 255
+            x += 1
+        }
+        y += 1
+    }
+
+    $edge_cnt := 0
+    $p := 0
+    while p < 6 {
+        $x := 0
+        while x < w {
+            blur[x] = img[x]
+            blur[(h - 1) * w + x] = img[(h - 1) * w + x]
+            x += 1
+        }
+        y = 1
+        while y < h - 1 {
+            row := y * w
+            blur[row] = img[row]
+            blur[row + w - 1] = img[row + w - 1]
+            x = 1
+            while x < w - 1 {
+                idx := row + x
+                s := img[idx - w - 1] + 2 * img[idx - w] + img[idx - w + 1] + 2 * img[idx - 1] + 4 * img[idx] + 2 * img[idx + 1] + img[idx + w - 1] + 2 * img[idx + w] + img[idx + w + 1]
+                blur[idx] = s >> 4
+                x += 1
+            }
+            y += 1
+        }
+        y = 1
+        while y < h - 1 {
+            row := y * w
+            x = 1
+            while x < w - 1 {
+                idx := row + x
+                $gx := -blur[idx - w - 1] + blur[idx - w + 1] - 2 * blur[idx - 1] + 2 * blur[idx + 1] - blur[idx + w - 1] + blur[idx + w + 1]
+                $gy := -blur[idx - w - 1] - 2 * blur[idx - w] - blur[idx - w + 1] + blur[idx + w - 1] + 2 * blur[idx + w] + blur[idx + w + 1]
+                if gx < 0 {
+                    gx = -gx
+                }
+                if gy < 0 {
+                    gy = -gy
+                }
+                $mag := gx + gy
+                if mag > 255 {
+                    mag = 255
+                }
+                edges[idx] = mag
+                if mag >= 64 {
+                    edge_cnt += 1
+                }
+                x += 1
+            }
+            y += 1
+        }
+        i = 0
+        while i < total_px {
+            img[i] = (blur[i] * 3 + edges[i]) >> 2
+            i += 1
+        }
+        p += 1
+    }
+
+    $ck := 0
+    i = 0
+    while i < total_px {
+        ck = (ck * 131 + edges[i]) % mod_v
+        i += 1
+    }
+
+    println(edge_cnt)
+    println(ck)
+    << 0
+}

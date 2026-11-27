@@ -1,0 +1,210 @@
+@main
+
+struct Wheel {
+    pub t_exp []int
+    pub t_per []int
+    pub t_rep []int
+    pub t_pay []int
+    pub t_st []int
+    pub t_prev []int
+    pub t_next []int
+    pub t_bkt []int
+    pub b_head []int
+    pub b_tail []int
+    pub free_stack []int
+    pub free_top int
+}
+
+fn new_wheel() Wheel {
+    max_nodes := 131072
+    $w := Wheel{
+        t_exp: []int{},
+        t_per: []int{},
+        t_rep: []int{},
+        t_pay: []int{},
+        t_st: []int{},
+        t_prev: []int{},
+        t_next: []int{},
+        t_bkt: []int{},
+        b_head: []int{},
+        b_tail: []int{},
+        free_stack: []int{},
+        free_top: max_nodes
+    }
+    $i := 0
+    while i < max_nodes {
+        w.t_exp.push(0)
+        w.t_per.push(0)
+        w.t_rep.push(0)
+        w.t_pay.push(0)
+        w.t_st.push(0)
+        w.t_prev.push(-1)
+        w.t_next.push(-1)
+        w.t_bkt.push(-1)
+        w.free_stack.push(max_nodes - 1 - i)
+        i += 1
+    }
+    i = 0
+    while i < 512 {
+        w.b_head.push(-1)
+        w.b_tail.push(-1)
+        i += 1
+    }
+    << w
+}
+
+fn bkt_push(w $&Wheel, b int, u int) {
+    tail := w.b_tail[b]
+    w.t_prev[u] = tail
+    w.t_next[u] = -1
+    w.t_bkt[u] = b
+    if tail != -1 {
+        w.t_next[tail] = u
+    } else {
+        w.b_head[b] = u
+    }
+    w.b_tail[b] = u
+}
+
+fn bkt_remove(w $&Wheel, u int) {
+    b := w.t_bkt[u]
+    pr := w.t_prev[u]
+    nx := w.t_next[u]
+    if pr != -1 {
+        w.t_next[pr] = nx
+    } else {
+        w.b_head[b] = nx
+    }
+    if nx != -1 {
+        w.t_prev[nx] = pr
+    } else {
+        w.b_tail[b] = pr
+    }
+    w.t_prev[u] = -1
+    w.t_next[u] = -1
+    w.t_bkt[u] = -1
+}
+
+fn schedule_node(w $&Wheel, u int, exp int, now int) {
+    w.t_exp[u] = exp
+    w.t_st[u] = 1
+    if (exp - now) < 256 {
+        bkt_push(w, exp & 255, u)
+    } else {
+        bkt_push(w, 256 + ((exp >> 8) & 255), u)
+    }
+}
+
+fn main() int {
+    mod_v := 1000000007
+    ring_h := 16384
+    $w := new_wheel()
+    $rng := 888777666
+
+    $handles := []int{}
+    $i := 0
+    while i < ring_h {
+        handles.push(-1)
+        i += 1
+    }
+
+    $h_wr := 0
+    $fired := 0
+    $canceled := 0
+    $ck := 0
+
+    $now := 0
+    while now < 160000 {
+        $k := 0
+        while k < 3 {
+            if w.free_top > 0 {
+                w.free_top -= 1
+                u := w.free_stack[w.free_top]
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                $delay := 0
+                if (rng % 10) < 6 {
+                    rng = (rng * 1103515245 + 12345) & 2147483647
+                    delay = 1 + (rng % 250)
+                } else {
+                    rng = (rng * 1103515245 + 12345) & 2147483647
+                    delay = 256 + (rng % 4096)
+                }
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                $per := 0
+                $rep := 0
+                if (rng % 5) == 0 {
+                    rng = (rng * 1103515245 + 12345) & 2147483647
+                    per = 17 + (rng % 200)
+                    rep = 2
+                }
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                pay := rng % 100000
+                w.t_per[u] = per
+                w.t_rep[u] = rep
+                w.t_pay[u] = pay
+                schedule_node($&w, u, now + delay, now)
+                handles[h_wr] = u
+                h_wr = (h_wr + 1) & 16383
+            }
+            k += 1
+        }
+
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        ci := rng & 16383
+        cu := handles[ci]
+        if cu != -1 && w.t_st[cu] == 1 {
+            bkt_remove($&w, cu)
+            w.t_st[cu] = 0
+            w.free_stack[w.free_top] = cu
+            w.free_top += 1
+            handles[ci] = -1
+            canceled += 1
+        }
+
+        tick := now + 1
+        if (tick & 255) == 0 {
+            cb := 256 + ((tick >> 8) & 255)
+            $u := w.b_head[cb]
+            w.b_head[cb] = -1
+            w.b_tail[cb] = -1
+            while u != -1 {
+                nx := w.t_next[u]
+                w.t_prev[u] = -1
+                w.t_next[u] = -1
+                w.t_bkt[u] = -1
+                exp_b := w.t_exp[u] & 255
+                bkt_push($&w, exp_b, u)
+                u = nx
+            }
+        }
+
+        b0 := tick & 255
+        $u := w.b_head[b0]
+        w.b_head[b0] = -1
+        w.b_tail[b0] = -1
+        while u != -1 {
+            nx := w.t_next[u]
+            w.t_prev[u] = -1
+            w.t_next[u] = -1
+            w.t_bkt[u] = -1
+            fired += 1
+            ck = (ck * 31 + w.t_pay[u] * 7 + tick) % mod_v
+            if w.t_rep[u] > 0 {
+                w.t_rep[u] -= 1
+                next_exp := tick + w.t_per[u]
+                schedule_node($&w, u, next_exp, tick)
+            } else {
+                w.t_st[u] = 0
+                w.free_stack[w.free_top] = u
+                w.free_top += 1
+            }
+            u = nx
+        }
+        now += 1
+    }
+
+    ck = (ck * 37 + canceled) % mod_v
+    println(fired)
+    println(ck)
+    << 0
+}

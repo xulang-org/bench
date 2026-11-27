@@ -1,0 +1,209 @@
+@main
+
+fn mix32(x int) int {
+    mask := 4294967295
+    mul := 73244475
+    $h := x & mask
+    h = h ^ (h >> 16)
+    h = (h * mul) & mask
+    h = h ^ (h >> 16)
+    h = (h * mul) & mask
+    h = h ^ (h >> 16)
+    << h
+}
+
+fn sift_max_ring(rt $&[]int, rn $&[]int, start int, n int) {
+    $i := start
+    while true {
+        l := i * 2 + 1
+        if l >= n {
+            <-
+        }
+        $best := l
+        r := l + 1
+        if r < n && rt[r] > rt[best] {
+            best = r
+        }
+        if rt[i] < rt[best] {
+            tt := rt[i]
+            rt[i] = rt[best]
+            rt[best] = tt
+            tn := rn[i]
+            rn[i] = rn[best]
+            rn[best] = tn
+            i = best
+        } else {
+            <-
+        }
+    }
+}
+
+fn heapsort_ring(rt $&[]int, rn $&[]int, n int) {
+    $start := (n / 2) - 1
+    while start >= 0 {
+        sift_max_ring(rt, rn, start, n)
+        start -= 1
+    }
+    $end := n - 1
+    while end > 0 {
+        tt := rt[0]
+        rt[0] = rt[end]
+        rt[end] = tt
+        tn := rn[0]
+        rn[0] = rn[end]
+        rn[end] = tn
+        sift_max_ring(rt, rn, 0, end)
+        end -= 1
+    }
+}
+
+fn build_ring(alive &[]int, ring_tok $&[]int, ring_node $&[]int) int {
+    max_nodes := 48
+    vnodes := 128
+    gold_c := 2654435769
+    $sz := 0
+    $nid := 0
+    while nid < max_nodes {
+        if alive[nid] == 1 {
+            $v := 0
+            while v < vnodes {
+                ring_tok[sz] = mix32(((nid << 10) | v) ^ gold_c)
+                ring_node[sz] = nid
+                sz += 1
+                v += 1
+            }
+        }
+        nid += 1
+    }
+    heapsort_ring(ring_tok, ring_node, sz)
+    << sz
+}
+
+fn route_tok(ring_tok &[]int, ring_node &[]int, tok int, sz int) int {
+    $lo := 0
+    $hi := sz
+    while lo < hi {
+        mid := (lo + hi) >> 1
+        if ring_tok[mid] < tok {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    if lo == sz {
+        lo = 0
+    }
+    << ring_node[lo]
+}
+
+fn main() int {
+    mod_v := 1000000007
+    mask32 := 4294967295
+    max_nodes := 48
+    vnodes := 128
+    n_keys := 150000
+
+    $alive := []int{}
+    $node_load := []int{}
+    $nid := 0
+    while nid < max_nodes {
+        if nid < 32 {
+            alive.push(1)
+        } else {
+            alive.push(0)
+        }
+        node_load.push(0)
+        nid += 1
+    }
+
+    $ring_tok := []int{}
+    $ring_node := []int{}
+    $i := 0
+    while i < max_nodes * vnodes {
+        ring_tok.push(0)
+        ring_node.push(0)
+        i += 1
+    }
+
+    $key_tok := []int{}
+    $prev_owner := []int{}
+    i = 0
+    while i < n_keys {
+        key_tok.push(mix32((i * 2654435761 + 12345) & mask32))
+        prev_owner.push(0)
+        i += 1
+    }
+
+    $ring_sz := build_ring(&alive, $&ring_tok, $&ring_node)
+    $ck := 0
+    $p := 0
+    while p < 4 {
+        salt := p * 7919
+        i = 0
+        while i < n_keys {
+            t := mix32((key_tok[i] + salt) & mask32)
+            owner := route_tok(&ring_tok, &ring_node, t, ring_sz)
+            node_load[owner] += 1
+            ck = (ck * 31 + owner + 1) % mod_v
+            i += 1
+        }
+        p += 1
+    }
+
+    i = 0
+    while i < n_keys {
+        prev_owner[i] = route_tok(&ring_tok, &ring_node, key_tok[i], ring_sz)
+        i += 1
+    }
+
+    $total_moved := 0
+    $step := 0
+    while step < 4 {
+        if step == 0 {
+            alive[32] = 1
+            alive[33] = 1
+            alive[34] = 1
+            alive[35] = 1
+        } else if step == 1 {
+            alive[5] = 0
+            alive[19] = 0
+        } else if step == 2 {
+            alive[36] = 1
+            alive[37] = 1
+            alive[38] = 1
+            alive[39] = 1
+            alive[40] = 1
+            alive[41] = 1
+        } else {
+            alive[2] = 0
+            alive[11] = 0
+            alive[24] = 0
+            alive[33] = 0
+        }
+        ring_sz = build_ring(&alive, $&ring_tok, $&ring_node)
+        $moved := 0
+        i = 0
+        while i < n_keys {
+            o := route_tok(&ring_tok, &ring_node, key_tok[i], ring_sz)
+            if o != prev_owner[i] {
+                moved += 1
+                prev_owner[i] = o
+            }
+            ck = (ck * 31 + o + 1) % mod_v
+            i += 1
+        }
+        total_moved += moved
+        ck = (ck * 37 + moved) % mod_v
+        step += 1
+    }
+
+    nid = 0
+    while nid < max_nodes {
+        ck = (ck * 31 + node_load[nid]) % mod_v
+        nid += 1
+    }
+
+    println(total_moved)
+    println(ck)
+    << 0
+}

@@ -1,0 +1,177 @@
+@main
+
+#math
+
+struct SciRandom {
+    pub m []int
+    pub idx_i int
+    pub idx_j int
+}
+
+fn new_random(seed int) SciRandom {
+    m1 := 2147483647
+    m2 := 65536
+    $m := []int{}
+    $k := 0
+    while k < 17 {
+        m.push(0)
+        k += 1
+    }
+    $jseed := seed
+    if jseed < 0 {
+        jseed = 0 - jseed
+    }
+    if jseed > m1 {
+        jseed = m1
+    }
+    if jseed % 2 == 0 {
+        jseed -= 1
+    }
+    k0 := 9069 % m2
+    k1 := 9069 / m2
+    $j0 := jseed % m2
+    $j1 := jseed / m2
+    $iloop := 0
+    while iloop < 17 {
+        jseed = j0 * k0
+        j1 = (jseed / m2 + j0 * k1 + j1 * k0) % (m2 / 2)
+        j0 = jseed % m2
+        m[iloop] = j0 + m2 * j1
+        iloop += 1
+    }
+    << SciRandom{m: m, idx_i: 4, idx_j: 16}
+}
+
+fn (r $&SciRandom) next_double() f64 {
+    m1 := 2147483647
+    dm1 := 1.0 / 2147483647.0
+    $k := r.m[r.idx_i] - r.m[r.idx_j]
+    if k < 0 {
+        k += m1
+    }
+    r.m[r.idx_j] = k
+    if r.idx_i == 0 {
+        r.idx_i = 16
+    } else {
+        r.idx_i -= 1
+    }
+    if r.idx_j == 0 {
+        r.idx_j = 16
+    } else {
+        r.idx_j -= 1
+    }
+    << dm1 * f64(k)
+}
+
+fn fft_bitreverse(data $&[]f64, n int) {
+    $j := 0
+    $i := 0
+    while i < n - 1 {
+        if i < j {
+            ii := 2 * i
+            jj := 2 * j
+            tr := data[ii]
+            ti := data[ii + 1]
+            data[ii] = data[jj]
+            data[ii + 1] = data[jj + 1]
+            data[jj] = tr
+            data[jj + 1] = ti
+        }
+        $k := n >> 1
+        while k <= j {
+            j -= k
+            k = k >> 1
+        }
+        j += k
+        i += 1
+    }
+}
+
+fn fft_transform(data $&[]f64, n int, direction f64) {
+    fft_bitreverse(data, n)
+    pi := math.pi()
+    $dual := 1
+    $bit := 0
+    while bit < 10 {
+        $w_real := 1.0
+        $w_imag := 0.0
+        theta := 2.0 * direction * pi / (2.0 * f64(dual))
+        s := math.sin(theta)
+        t := math.sin(theta * 0.5)
+        s2 := 2.0 * t * t
+
+        $b := 0
+        while b < n {
+            i := 2 * b
+            j := 2 * (b + dual)
+            wd_real := data[j]
+            wd_imag := data[j + 1]
+            data[j] = data[i] - wd_real
+            data[j + 1] = data[i + 1] - wd_imag
+            data[i] += wd_real
+            data[i + 1] += wd_imag
+            b += 2 * dual
+        }
+
+        $a := 1
+        while a < dual {
+            tmp_real := w_real - s * w_imag - s2 * w_real
+            tmp_imag := w_imag + s * w_real - s2 * w_imag
+            w_real = tmp_real
+            w_imag = tmp_imag
+            b = 0
+            while b < n {
+                i := 2 * (b + a)
+                j := 2 * (b + a + dual)
+                z1_real := data[j]
+                z1_imag := data[j + 1]
+                wd_real := w_real * z1_real - w_imag * z1_imag
+                wd_imag := w_real * z1_imag + w_imag * z1_real
+                data[j] = data[i] - wd_real
+                data[j + 1] = data[i + 1] - wd_imag
+                data[i] += wd_real
+                data[i + 1] += wd_imag
+                b += 2 * dual
+            }
+            a += 1
+        }
+        dual *= 2
+        bit += 1
+    }
+}
+
+fn main() int {
+    n := 1024
+    $rng := new_random(101010)
+    $orig := []f64{}
+    $data := []f64{}
+    $i := 0
+    while i < 2 * n {
+        orig.push(rng.next_double())
+        data.push(0.0)
+        i += 1
+    }
+
+    norm := 1.0 / f64(n)
+    $acc := 0.0
+    $rep := 0
+    while rep < 200 {
+        i = 0
+        while i < 2 * n {
+            data[i] = orig[i]
+            i += 1
+        }
+        fft_transform($&data, n, -1.0)
+        acc += math.abs(data[0]) + math.abs(data[1]) + math.abs(data[2 * ((rep * 7) % 512)])
+        fft_transform($&data, n, 1.0)
+        i = 0
+        while i < 2 * n {
+            data[i] *= norm
+            i += 1
+        }
+        acc += math.abs(data[2 * ((rep * 13) % 512)])
+        rep += 1
+    }
+    println(int(math.floor(acc * 10.0 + 0.5)))
+    << 0
+}

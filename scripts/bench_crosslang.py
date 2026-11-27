@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -93,6 +94,11 @@ def c_profiles(compiler: str) -> tuple:
     """Keep C optimization levels comparable without relabelling GCC as Clang."""
     return tuple((level, f"{compiler} -O{level}", list(flags), tag)
                  for level, _label, flags, tag in C_LEVELS)
+
+
+def c_link_flags() -> list[str]:
+    """Link libm on POSIX platforms for C workloads using <math.h>."""
+    return ["-lm"] if sys.platform != "win32" else []
 
 
 def select_c_compiler(explicit: str | None, target: str | None) -> str:
@@ -246,6 +252,55 @@ BENCHES: list[Bench] = [
     Bench('tak', '9\n', 'Osprey: Takeuchi function tak(32,16,8) — heavy ternary self-recursion', CORE),
     Bench('osprey_textstats', '1574956\n', 'Osprey: 200000 tokens, 8 words; length + contains(o) + startsWith(t)', CORE),
     Bench('word_frequency', '900036\n', 'Osprey: 200000 tokens, 8 words; string-keyed frequency map, weighted counts', CORE),
+    Bench("avl_tree", "657632476\n", "AVL 平衡二叉树(8万插入+30万查找)", CORE),
+    Bench("chacha20_stream", "1354950752\n", "ChaCha20 流密码块生成(3万块)", CORE),
+    Bench("huffman_coding", "42194116\n", "Huffman 编码建树与位流编解码(50轮)", CORE),
+    Bench("json_tokenizer", "3498070\n", "JSON 词法扫描器(1000轮)", CORE),
+    Bench("lzw_codec", "1265119\n", "LZW 压缩与解压(LSB 8-bit, 2500轮)", CORE),
+    Bench("plb2_nqueen", "2279184\n", "PLB2: 15 皇后位运算迭代回溯", CORE),
+    Bench("plb2_sudoku", "76429265\n", "PLB2: kudoku 精确覆盖数独求解(10题×20轮)", CORE),
+    Bench("plb2_bedcov", "20405663\n25513653603\n", "PLB2: 隐式区间树重叠统计(20万×20万)", CORE),
+    Bench("thread_ring", "407\n", "并发令牌环(503协程×10万次传递)", ("go", "rs")),
+    Bench("skynet", "999000\n", "并发10叉树扇出汇总(2轮×1111任务)", ("go",)),
+    Bench("scimark_montecarlo", "3926586\n", "SciMark2: 蒙特卡洛圆周率采样(500万次)", CORE),
+    Bench("scimark_sor", "5088322\n", "SciMark2: 100×100 二维 SOR 超松弛(500轮)", CORE),
+    Bench("scimark_lu", "15237382\n", "SciMark2: 100×100 稠密矩阵部分主元 LU 分解(30轮)", CORE),
+    Bench("scimark_sparse", "12396499\n", "SciMark2: CSR 稀疏矩阵向量乘(10000阶×500轮)", CORE),
+    Bench("scimark_fft", "2079250\n", "SciMark2: 1024点 Radix-2 复数正逆 FFT(200轮)", CORE),
+    Bench("awfy_richards", "1162300\n464850\n", "AWFY: OS 任务调度器模拟(6任务×50轮)", CORE),
+    Bench("awfy_json_parser", "329600\n588731237\n", "AWFY: 递归下降完整 JSON AST 解析(400轮)", CORE),
+    Bench("brainfuck_vm", "186\n6000\n", "Brainfuck 字节码虚拟机(4轮×~518万步)", CORE),
+    Bench("regex_nfa", "17230\n186585093\n", "Thompson NFA 正则引擎(6000行×6模式)", CORE),
+    Bench("treap_ops", "17134\n436917351\n22203\n", "无旋转分裂合并 Treap 树堆(12万次混合操作)", CORE),
+    Bench("astar_maze", "11142\n988916597\n", "81×81 迷宫最短路 A* 搜索(60张迷宫)", CORE),
+    Bench("levenshtein_dp", "49141\n889616294\n", "Levenshtein 编辑距离双行 DP(400对序列)", CORE),
+    Bench("csv_aggregate", "1000000\n380078855\n", "十万行 CSV 定点解析与哈希聚合(10轮)", CORE),
+    Bench("http_router_parse", "106000\n493970096\n", "HTTP/1.1 请求解析与 Trie 动态路由(12万次)", CORE),
+    Bench("websocket_frame", "16882560\n995067448\n", "WebSocket 帧编解码与掩码异或(80帧×180轮)", CORE),
+    Bench("protobuf_varint", "8738912\n198544933\n", "Protobuf Varint/ZigZag 二进制 RPC 编解码(20万条)", CORE),
+    Bench("toml_config_parse", "336000\n82034545\n", "TOML 多节配置文件词法解析(48节×1000轮)", CORE),
+    Bench("template_render", "11585000\n816359811\n", "HTML 模板字节码编译与 XSS 转义渲染(1万页)", CORE),
+    Bench("hmac_pbkdf2", "280\nf88ff7eadf3c76f6a2d3098ac8740bffb1fc75bf364f984233c86d1659bed2ec\n", "HMAC-SHA256 与 PBKDF2 密钥派生(80 KDF + 200 HMAC)", CORE),
+    Bench("btree_index", "156642\n923128089\n", "Order-32 B+ 树索引(8万插+12万查+2千范围扫描)", CORE),
+    Bench("lsm_compaction", "210492\n473464819\n", "LSM-Tree 刷盘、多路堆归并压缩与 SSTable 查询(4轮)", CORE),
+    Bench("bm25_search", "20000\n285545384\n", "CSR 倒排索引与定点 BM25 Top-10 检索(6000文档×2000查询)", CORE),
+    Bench("sql_query_exec", "1053790\n365717875\n", "列式表过滤、Hash Join、GROUP BY 与排序聚合(16轮×20万行)", CORE),
+    Bench("consistent_hash", "61873\n601893444\n", "虚拟节点一致性哈希环路由与4次拓扑扩缩容迁移", CORE),
+    Bench("wal_log_recovery", "119984\n241048890\n", "二进制 WAL 日志 CRC-32 校验、尾截断恢复与 KV 重放(40段)", CORE),
+    Bench("expr_bytecode_vm", "5488000\n628681581\n", "表达式词法/递归下降编译与栈字节码虚拟机(16式×160轮×100次)", CORE),
+    Bench("myers_diff", "35144\n450000758\n", "Myers O(ND) 最短编辑脚本回溯与差异重构(1200对序列)", CORE),
+    Bench("slab_allocator", "300032\n352385751\n", "分级 Slab 内存分配器、侵入式空闲链表与整页回收(60万次)", CORE),
+    Bench("timing_wheel", "479931\n463812537\n", "双层层级时间轮调度器、级联下沉与 O(1) 取消(16万滴答)", CORE),
+    Bench("lz4_block_codec", "609348\n141693848\n", "LZ4 块级哈希匹配无损压缩与重叠拷贝解压(24×32KiB×4轮)", CORE),
+    Bench("utf8_text_norm", "2339280\n538177438\n", "多语种 UTF-8 严格校验解码、大小写/全角折叠与空白规整(40轮)", CORE),
+    Bench("raytrace_sphere", "67051\n1054947\n", "3D 球体光线追踪、阴影射线与3层镜面反射(320×240)", CORE),
+    Bench("image_sobel_blur", "347022\n56665161\n", "512×512 图像 3×3 高斯模糊与 Sobel 边缘检测流水线(6轮)", CORE),
+    Bench("physics_collision", "5806\n207742175\n", "2D 空间哈希广相与定点弹性碰撞物理仿真(512刚体×500步)", CORE),
+    Bench("mlp_inference", "8065\n3467\n", "3层稠密神经网络 MLP 前向推理与 ReLU/Argmax(64→128→64→16×2000)", CORE),
+    Bench("kmeans_cluster", "267395148\n88966\n", "8维 K-Means 聚类迭代(8192点×16簇×25轮)", CORE),
+    Bench("order_book_match", "161133\n760872136\n", "金融限价订单簿价格-时间优先撮合与 O(1) 撤单(25万事件)", CORE),
+    Bench("x25519_dh", "100\nb1a5a73158904c020866c13939dd7e1aa26852ee1d2609c92e5a8f1debe2150a\n", "RFC 7748 Curve25519 / X25519 蒙哥马利阶梯密钥交换(100轮)", CORE),
+    Bench("parallel_mapreduce", "8388608\n317365354\n", "8 Worker 并发 MapReduce 通道扇出/归约流水线(64分片×13万条)", ("go", "rs")),
 ]
 
 BY_NAME = {b.name: b for b in BENCHES}
@@ -399,6 +454,119 @@ def parse_benches(s: str | None) -> list[Bench]:
     return out
 
 
+# Fixed per-benchmark compile and harness overhead so tiny workloads don't pile
+# into one shard with disproportionate build/launch time.
+SHARD_BASE_WEIGHT = 4
+SHARD_WEIGHTS: dict[str, int] = {
+    "aes256_decrypt": 26,
+    "aes256_encrypt": 24,
+    "aes192_decrypt": 22,
+    "osprey_binarytrees": 19,
+    "aes192_encrypt": 18,
+    "aes128_decrypt": 18,
+    "aes128_encrypt": 17,
+    "strings_io": 11,
+    "algorithm_search": 9,
+    "math_bits": 6,
+    "http_concurrent": 6,
+    "loop_sum": 5,
+    "match_sum": 4,
+    "md5_chain": 4,
+    "aes256_key_setup": 4,
+    "aes192_key_setup": 4,
+    "aes128_key_setup": 4,
+    "gcd_sum": 3,
+    "plb2_nqueen": 3,
+    "plb2_bedcov": 3,
+    "scimark_lu": 3,
+    "treap_ops": 3,
+    "osprey_coprime": 2,
+    "scan_dep": 2,
+    "copy_bytes": 2,
+    "chase_index": 2,
+    "file_roundtrip": 2,
+    "plb2_sudoku": 2,
+    "scimark_fft": 2,
+    "scimark_sor": 2,
+    "scimark_sparse": 2,
+    "scimark_montecarlo": 2,
+    "awfy_richards": 2,
+    "awfy_json_parser": 2,
+    "csv_aggregate": 2,
+    "astar_maze": 2,
+    "levenshtein_dp": 2,
+    "http_router_parse": 2,
+    "websocket_frame": 2,
+    "protobuf_varint": 2,
+    "toml_config_parse": 2,
+    "template_render": 2,
+    "hmac_pbkdf2": 2,
+    "btree_index": 2,
+    "lsm_compaction": 2,
+    "bm25_search": 2,
+    "sql_query_exec": 2,
+    "consistent_hash": 2,
+    "wal_log_recovery": 2,
+    "expr_bytecode_vm": 2,
+    "myers_diff": 2,
+    "slab_allocator": 2,
+    "timing_wheel": 2,
+    "lz4_block_codec": 2,
+    "utf8_text_norm": 2,
+    "raytrace_sphere": 2,
+    "image_sobel_blur": 2,
+    "physics_collision": 2,
+    "mlp_inference": 2,
+    "kmeans_cluster": 2,
+    "order_book_match": 2,
+    "x25519_dh": 2,
+    "parallel_mapreduce": 2,
+}
+
+
+def bench_shard_weight(bench: Bench) -> int:
+    """Return estimated relative CI cost for balanced shard packing."""
+    extra = SHARD_WEIGHTS.get(bench.name, 1 if bench.xu_opt_matrix else 0)
+    return SHARD_BASE_WEIGHT + extra
+
+
+def parse_shard(spec: str) -> tuple[int, int]:
+    """Parse a 1-based 'k/N' shard specifier and validate bounds."""
+    match = re.fullmatch(r"\s*(\d+)\s*/\s*(\d+)\s*", spec)
+    if not match:
+        raise ValueError(f"invalid shard spec {spec!r}; expected k/N")
+    index, total = int(match.group(1)), int(match.group(2))
+    if total < 1 or index < 1 or index > total:
+        raise ValueError(f"shard spec {spec!r} out of range (need 1 <= k <= N and N >= 1)")
+    return index, total
+
+
+def partition_shards(benches: list[Bench], total: int) -> list[list[Bench]]:
+    """Deterministically partition benches into `total` cost-balanced shards via LPT."""
+    if total < 1:
+        raise ValueError(f"shard total must be >= 1, got {total}")
+    if total == 1:
+        return [list(benches)]
+    pos = {b.name: i for i, b in enumerate(benches)}
+    ordered = sorted(benches, key=lambda b: (-bench_shard_weight(b), pos[b.name]))
+    loads = [0] * total
+    buckets: list[list[Bench]] = [[] for _ in range(total)]
+    for bench in ordered:
+        idx = min(range(total), key=lambda i: (loads[i], len(buckets[i]), i))
+        buckets[idx].append(bench)
+        loads[idx] += bench_shard_weight(bench)
+    for bucket in buckets:
+        bucket.sort(key=lambda b: pos[b.name])
+    return buckets
+
+
+def select_shard(benches: list[Bench], index: int, total: int) -> list[Bench]:
+    """Select 1-based shard `index` out of `total` partitions."""
+    if total < 1 or index < 1 or index > total:
+        raise ValueError(f"shard {index}/{total} out of range")
+    return partition_shards(benches, total)[index - 1]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", help="write report here (required unless --list)")
@@ -450,6 +618,11 @@ def main():
         "--curves-dir",
         help="write RSS CSV+SVG curves here (default: <out>.curves/)",
     )
+    ap.add_argument(
+        "--shard",
+        default=None,
+        help="run 1-based shard k/N using cost-balanced partitioning",
+    )
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
     if args.out:
@@ -459,18 +632,37 @@ def main():
     if args.sample_ms < 0:
         raise SystemExit("--sample-ms must be >= 0")
 
+    shard_spec: tuple[int, int] | None = None
+    if args.shard is not None:
+        try:
+            shard_spec = parse_shard(args.shard)
+        except ValueError as exc:
+            raise SystemExit(f"--shard: {exc}")
+
+    selected = parse_benches(args.benches)
+    if shard_spec is not None:
+        shard_index, shard_total = shard_spec
+        selected = select_shard(selected, shard_index, shard_total)
+
     if args.list:
+        if shard_spec is not None:
+            total_w = sum(bench_shard_weight(b) for b in selected)
+            print(f"# shard {shard_spec[0]}/{shard_spec[1]}: {len(selected)} benches, total_weight={total_w}")
+        listed = selected if (args.benches or shard_spec is not None) else BENCHES
         print(f"{'bench':<16} {'langs':<22} face")
-        for b in BENCHES:
+        for b in listed:
             print(f"{b.name:<16} {','.join(b.langs):<22} {b.face}")
         return
 
     if not args.out:
         raise SystemExit("--out is required (or use --list)")
 
-    xu_compiler = resolve_product_xu(args.xu)
+    if shard_spec is not None and not selected:
+        raise SystemExit(
+            f"shard {shard_spec[0]}/{shard_spec[1]} has no workloads for the requested selection"
+        )
 
-    selected = parse_benches(args.benches)
+    xu_compiler = resolve_product_xu(args.xu)
     import platform
     raw_machine = platform.machine().lower()
     if raw_machine in ("arm64", "aarch64"):
@@ -551,6 +743,8 @@ def main():
         "# suite: language-capability (same algorithm; int=i64; while-counted)"
     )
     log(f"# benches: {', '.join(b.name for b in selected)}")
+    if shard_spec is not None:
+        log(f"# shard: {shard_spec[0]}/{shard_spec[1]}")
     if cross_arch:
         log("# cross-arch peers: clang only (Go/Rust/Swift host binaries omitted)")
     # Cross-target Apple flags require Clang. GCC fallback is host-only and
@@ -609,7 +803,7 @@ def main():
                 add(
                     f"{c_name} -O0",
                     bench.name,
-                    [c_name, *clang_arch_flags, "-O0", "-o", str(out0), str(src)],
+                    [c_name, *clang_arch_flags, "-O0", "-o", str(out0), str(src), *c_link_flags()],
                     out0,
                 )
             for _level, label, flags, tag in c_levels:
@@ -617,7 +811,7 @@ def main():
                 add(
                     label,
                     bench.name,
-                    [c_name, *clang_arch_flags, *flags, "-o", str(out), str(src)],
+                    [c_name, *clang_arch_flags, *flags, "-o", str(out), str(src), *c_link_flags()],
                     out,
                 )
         if "rs" in langs and tools["rustc"] and not cross_arch:
@@ -796,6 +990,7 @@ def main():
                                 "-o",
                                 str(tmp / f"ct_c_{bench.name}_{tag}"),
                                 str(cross_src(bench.name, "c")),
+                                *c_link_flags(),
                             ],
                         )
                     )

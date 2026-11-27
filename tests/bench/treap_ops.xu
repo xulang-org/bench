@@ -1,0 +1,147 @@
+@main
+
+struct Pair {
+    pub l int
+    pub r int
+}
+
+struct Treap {
+    pub key []int
+    pub pri []int
+    pub left []int
+    pub right []int
+    pub free_head int
+    pub root int
+    pub size int
+}
+
+fn new_treap() Treap {
+    << Treap{
+        key: []int{},
+        pri: []int{},
+        left: []int{},
+        right: []int{},
+        free_head: -1,
+        root: -1,
+        size: 0
+    }
+}
+
+fn alloc_node(t $&Treap, k int, p int) int {
+    if t.free_head != -1 {
+        idx := t.free_head
+        t.free_head = t.left[idx]
+        t.key[idx] = k
+        t.pri[idx] = p
+        t.left[idx] = -1
+        t.right[idx] = -1
+        << idx
+    }
+    idx := t.key.len
+    t.key.push(k)
+    t.pri.push(p)
+    t.left.push(-1)
+    t.right.push(-1)
+    << idx
+}
+
+fn free_node(t $&Treap, idx int) {
+    t.left[idx] = t.free_head
+    t.right[idx] = -1
+    t.free_head = idx
+}
+
+fn split(t $&Treap, u int, k int) Pair {
+    if u == -1 {
+        << Pair{l: -1, r: -1}
+    }
+    if t.key[u] < k {
+        p := split(t, t.right[u], k)
+        t.right[u] = p.l
+        << Pair{l: u, r: p.r}
+    }
+    p := split(t, t.left[u], k)
+    t.left[u] = p.r
+    << Pair{l: p.l, r: u}
+}
+
+fn merge(t $&Treap, a int, b int) int {
+    if a == -1 {
+        << b
+    }
+    if b == -1 {
+        << a
+    }
+    if t.pri[a] > t.pri[b] {
+        t.right[a] = merge(t, t.right[a], b)
+        << a
+    }
+    t.left[b] = merge(t, a, t.left[b])
+    << b
+}
+
+fn contains(t $&Treap, k int) bool {
+    $u := t.root
+    while u != -1 {
+        ku := t.key[u]
+        if k == ku {
+            << true
+        }
+        if k < ku {
+            u = t.left[u]
+        } else {
+            u = t.right[u]
+        }
+    }
+    << false
+}
+
+fn insert(t $&Treap, k int, p int) {
+    if contains(t, k) {
+        <<
+    }
+    sp := split(t, t.root, k)
+    n := alloc_node(t, k, p)
+    t.root = merge(t, merge(t, sp.l, n), sp.r)
+    t.size += 1
+}
+
+fn erase(t $&Treap, k int) {
+    sp1 := split(t, t.root, k)
+    sp2 := split(t, sp1.r, k + 1)
+    if sp2.l != -1 {
+        free_node(t, sp2.l)
+        t.size -= 1
+    }
+    t.root = merge(t, sp1.l, sp2.r)
+}
+
+fn main() int {
+    $tr := new_treap()
+    $rng := 123456789
+    $hits := 0
+    $ck := 0
+    $step := 0
+    while step < 120000 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        op := rng % 10
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        k := rng % 40000
+        if op < 4 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            insert($&tr, k, rng)
+        } else if op < 6 {
+            erase($&tr, k)
+        } else {
+            if contains($&tr, k) {
+                hits += 1
+                ck = (ck * 131 + k + 1) % 1000000007
+            }
+        }
+        step += 1
+    }
+    println(hits)
+    println(ck)
+    println(tr.size)
+    << 0
+}

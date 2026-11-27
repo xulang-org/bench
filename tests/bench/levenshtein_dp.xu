@@ -1,0 +1,85 @@
+@main
+
+fn main() int {
+    $a := []int{}
+    $b := []int{}
+    $i := 0
+    while i < 256 {
+        a.push(0)
+        b.push(0)
+        i += 1
+    }
+    $dp := []int{}
+    i = 0
+    while i < 512 {
+        dp.push(0)
+        i += 1
+    }
+
+    $rng := 987654321
+    $sum_lev := 0
+    $ck_lev := 0
+    $p := 0
+    while p < 400 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        la := 120 + (rng % 100)
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        lb := 120 + (rng % 100)
+        i = 0
+        while i < la {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            a[i] = 97 + ((rng >> 16) & 7)
+            i += 1
+        }
+        i = 0
+        while i < lb {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            if i < la && (rng % 5) == 0 {
+                b[i] = a[i]
+            } else {
+                b[i] = 97 + ((rng >> 16) & 7)
+            }
+            i += 1
+        }
+
+        $j := 0
+        while j <= lb {
+            dp[j] = j
+            j += 1
+        }
+        i = 1
+        while i <= la {
+            cur_off := (i & 1) * 256
+            prev_off := 256 - cur_off
+            dp[cur_off] = i
+            ai := a[i - 1]
+            j = 1
+            while j <= lb {
+                $cost := 1
+                if ai == b[j - 1] {
+                    cost = 0
+                }
+                d1 := dp[prev_off + j] + 1
+                d2 := dp[cur_off + j - 1] + 1
+                d3 := dp[prev_off + j - 1] + cost
+                $best := d1
+                if d2 < best {
+                    best = d2
+                }
+                if d3 < best {
+                    best = d3
+                }
+                dp[cur_off + j] = best
+                j += 1
+            }
+            i += 1
+        }
+        d := dp[(la & 1) * 256 + lb]
+        sum_lev += d
+        ck_lev = (ck_lev * 1000003 + d) % 1000000007
+        p += 1
+    }
+    println(sum_lev)
+    println(ck_lev)
+    << 0
+}

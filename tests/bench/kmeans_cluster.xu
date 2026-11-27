@@ -1,0 +1,124 @@
+@main
+
+#math
+
+fn main() int {
+    mod_v := 1000000007
+    n := 8192
+    d := 8
+    k := 16
+    $rng := 84848484
+
+    $gt := []f64{}
+    $c := 0
+    while c < k * d {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        gt.push(f64((rng % 1000) - 500) / 16.0)
+        c += 1
+    }
+
+    $pts := []f64{}
+    $assign := []int{}
+    $i := 0
+    while i < n {
+        g := i & 15
+        $dim := 0
+        while dim < d {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            pts.push(gt[g * d + dim] + f64((rng % 129) - 64) / 32.0)
+            dim += 1
+        }
+        assign.push(0)
+        i += 1
+    }
+
+    $cent := []f64{}
+    $sum_c := []f64{}
+    c = 0
+    while c < k * d {
+        cent.push(pts[c])
+        sum_c.push(0.0)
+        c += 1
+    }
+
+    $cnt := []int{}
+    c = 0
+    while c < k {
+        cnt.push(0)
+        c += 1
+    }
+
+    $final_inertia := 0.0
+    $it := 0
+    while it < 25 {
+        c = 0
+        while c < k * d {
+            sum_c[c] = 0.0
+            c += 1
+        }
+        c = 0
+        while c < k {
+            cnt[c] = 0
+            c += 1
+        }
+        $inertia := 0.0
+        i = 0
+        while i < n {
+            pb := i * d
+            $best_c := 0
+            $best_d := 1.0e18
+            c = 0
+            while c < k {
+                cb := c * d
+                $dist := 0.0
+                $dim := 0
+                while dim < d {
+                    diff := pts[pb + dim] - cent[cb + dim]
+                    dist += diff * diff
+                    dim += 1
+                }
+                if dist < best_d {
+                    best_d = dist
+                    best_c = c
+                }
+                c += 1
+            }
+            assign[i] = best_c
+            cnt[best_c] += 1
+            inertia += best_d
+            cb := best_c * d
+            $dim := 0
+            while dim < d {
+                sum_c[cb + dim] += pts[pb + dim]
+                dim += 1
+            }
+            i += 1
+        }
+        c = 0
+        while c < k {
+            if cnt[c] > 0 {
+                inv := 1.0 / f64(cnt[c])
+                cb := c * d
+                $dim := 0
+                while dim < d {
+                    cent[cb + dim] = sum_c[cb + dim] * inv
+                    dim += 1
+                }
+            }
+            c += 1
+        }
+        final_inertia = inertia
+        it += 1
+    }
+
+    $ack := 0
+    i = 0
+    while i < n {
+        ack = (ack * 31 + assign[i] + 1) % mod_v
+        i += 1
+    }
+
+    println(ack)
+    println(int(math.floor(final_inertia + 0.5)))
+    << 0
+}

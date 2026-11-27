@@ -1,0 +1,333 @@
+@main
+
+fn push_ascii(buf $&[]int, s string) {
+    $i := 0
+    while i < s.len {
+        buf.push(s[i] & 255)
+        i += 1
+    }
+}
+
+fn append_phrase(buf $&[]int, k int) {
+    if k == 0 {
+        // {"level":"INFO","service":"storage-node","msg":"compaction_ok","ms":
+        push_ascii(buf, "{")
+        buf.push(34)
+        push_ascii(buf, "level")
+        buf.push(34)
+        push_ascii(buf, ":")
+        buf.push(34)
+        push_ascii(buf, "INFO")
+        buf.push(34)
+        push_ascii(buf, ",")
+        buf.push(34)
+        push_ascii(buf, "service")
+        buf.push(34)
+        push_ascii(buf, ":")
+        buf.push(34)
+        push_ascii(buf, "storage-node")
+        buf.push(34)
+        push_ascii(buf, ",")
+        buf.push(34)
+        push_ascii(buf, "msg")
+        buf.push(34)
+        push_ascii(buf, ":")
+        buf.push(34)
+        push_ascii(buf, "compaction_ok")
+        buf.push(34)
+        push_ascii(buf, ",")
+        buf.push(34)
+        push_ascii(buf, "ms")
+        buf.push(34)
+        push_ascii(buf, ":")
+    } else if k == 1 {
+        // {"level":"WARN","service":"rpc-gateway","msg":"retry_backoff","ms":
+        push_ascii(buf, "{")
+        buf.push(34)
+        push_ascii(buf, "level")
+        buf.push(34)
+        push_ascii(buf, ":")
+        buf.push(34)
+        push_ascii(buf, "WARN")
+        buf.push(34)
+        push_ascii(buf, ",")
+        buf.push(34)
+        push_ascii(buf, "service")
+        buf.push(34)
+        push_ascii(buf, ":")
+        buf.push(34)
+        push_ascii(buf, "rpc-gateway")
+        buf.push(34)
+        push_ascii(buf, ",")
+        buf.push(34)
+        push_ascii(buf, "msg")
+        buf.push(34)
+        push_ascii(buf, ":")
+        buf.push(34)
+        push_ascii(buf, "retry_backoff")
+        buf.push(34)
+        push_ascii(buf, ",")
+        buf.push(34)
+        push_ascii(buf, "ms")
+        buf.push(34)
+        push_ascii(buf, ":")
+    } else if k == 2 {
+        push_ascii(buf, "SELECT region, category, SUM(amount) FROM orders WHERE status = 1; ")
+    } else if k == 3 {
+        push_ascii(buf, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+    } else if k == 4 {
+        push_ascii(buf, "GET /api/v1/users/profile HTTP/1.1")
+        buf.push(13)
+        buf.push(10)
+        push_ascii(buf, "Host: api.xulang.org")
+        buf.push(13)
+        buf.push(10)
+        buf.push(13)
+        buf.push(10)
+    } else {
+        push_ascii(buf, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+    }
+}
+
+fn lz4_compress(blocks &[]int, src_off int, n int, ht $&[]int, comp $&[]int) int {
+    $i := 0
+    while i < 4096 {
+        ht[i] = -1
+        i += 1
+    }
+    $op := 0
+    $ip := 0
+    $anchor := 0
+    limit := n - 12
+    mflimit := n - 5
+    while ip < limit {
+        p := src_off + ip
+        seq := blocks[p] | (blocks[p + 1] << 8) | (blocks[p + 2] << 16) | (blocks[p + 3] << 24)
+        h := ((seq * 73244475) >> 18) & 4095
+        ref := ht[h]
+        ht[h] = ip
+        if ref >= 0 && (ip - ref) <= 65535 {
+            rp := src_off + ref
+            if blocks[rp] == blocks[p] && blocks[rp + 1] == blocks[p + 1] && blocks[rp + 2] == blocks[p + 2] && blocks[rp + 3] == blocks[p + 3] {
+                $mlen := 4
+                while ip + mlen < mflimit && blocks[rp + mlen] == blocks[p + mlen] {
+                    mlen += 1
+                }
+                lit_len := ip - anchor
+                m_extra := mlen - 4
+                $tok_lit := lit_len
+                if tok_lit >= 15 {
+                    tok_lit = 15
+                }
+                $tok_m := m_extra
+                if tok_m >= 15 {
+                    tok_m = 15
+                }
+                comp[op] = (tok_lit << 4) | tok_m
+                op += 1
+                if lit_len >= 15 {
+                    $rem := lit_len - 15
+                    while rem >= 255 {
+                        comp[op] = 255
+                        op += 1
+                        rem -= 255
+                    }
+                    comp[op] = rem
+                    op += 1
+                }
+                $j := 0
+                while j < lit_len {
+                    comp[op] = blocks[src_off + anchor + j]
+                    op += 1
+                    j += 1
+                }
+                off := ip - ref
+                comp[op] = off & 255
+                comp[op + 1] = (off >> 8) & 255
+                op += 2
+                if m_extra >= 15 {
+                    $rem := m_extra - 15
+                    while rem >= 255 {
+                        comp[op] = 255
+                        op += 1
+                        rem -= 255
+                    }
+                    comp[op] = rem
+                    op += 1
+                }
+                ip += mlen
+                anchor = ip
+                ->
+            }
+        }
+        ip += 1
+    }
+    lit_len := n - anchor
+    $tok_lit := lit_len
+    if tok_lit >= 15 {
+        tok_lit = 15
+    }
+    comp[op] = tok_lit << 4
+    op += 1
+    if lit_len >= 15 {
+        $rem := lit_len - 15
+        while rem >= 255 {
+            comp[op] = 255
+            op += 1
+            rem -= 255
+        }
+        comp[op] = rem
+        op += 1
+    }
+    $j := 0
+    while j < lit_len {
+        comp[op] = blocks[src_off + anchor + j]
+        op += 1
+        j += 1
+    }
+    << op
+}
+
+fn lz4_decompress(comp &[]int, clen int, decomp $&[]int) {
+    $ip := 0
+    $op := 0
+    while ip < clen {
+        tok := comp[ip]
+        ip += 1
+        $lit_len := tok >> 4
+        if lit_len == 15 {
+            while true {
+                b := comp[ip]
+                ip += 1
+                lit_len += b
+                if b != 255 {
+                    <-
+                }
+            }
+        }
+        $j := 0
+        while j < lit_len {
+            decomp[op] = comp[ip]
+            op += 1
+            ip += 1
+            j += 1
+        }
+        if ip >= clen {
+            <-
+        }
+        off := comp[ip] | (comp[ip + 1] << 8)
+        ip += 2
+        $mlen := (tok & 15) + 4
+        if (tok & 15) == 15 {
+            while true {
+                b := comp[ip]
+                ip += 1
+                mlen += b
+                if b != 255 {
+                    <-
+                }
+            }
+        }
+        mp := op - off
+        j = 0
+        while j < mlen {
+            decomp[op] = decomp[mp + j]
+            op += 1
+            j += 1
+        }
+    }
+}
+
+fn main() int {
+    mod_v := 1000000007
+    blk_len := 32768
+    $rng := 135724680
+
+    $blocks := []int{}
+    $bi := 0
+    while bi < 24 {
+        $src := []int{}
+        while src.len < blk_len {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            k := rng % 10
+            if k < 6 {
+                append_phrase($&src, k)
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                v := rng % 1000
+                src.push(48 + (v / 100))
+                src.push(48 + ((v / 10) % 10))
+                src.push(48 + (v % 10))
+                src.push(10)
+            } else if k < 8 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                ch := 65 + (rng % 26)
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                rl := 12 + (rng % 48)
+                $j := 0
+                while j < rl {
+                    src.push(ch)
+                    j += 1
+                }
+            } else {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                rl := 8 + (rng % 24)
+                $j := 0
+                while j < rl {
+                    rng = (rng * 1103515245 + 12345) & 2147483647
+                    src.push(32 + (rng % 95))
+                    j += 1
+                }
+            }
+        }
+        $i := 0
+        while i < blk_len {
+            blocks.push(src[i])
+            i += 1
+        }
+        bi += 1
+    }
+
+    $ht := []int{}
+    $i := 0
+    while i < 4096 {
+        ht.push(-1)
+        i += 1
+    }
+    $comp := []int{}
+    i = 0
+    while i < blk_len + 4096 {
+        comp.push(0)
+        i += 1
+    }
+    $decomp := []int{}
+    i = 0
+    while i < blk_len {
+        decomp.push(0)
+        i += 1
+    }
+
+    $total_comp := 0
+    $ck := 0
+    $rnd := 0
+    while rnd < 4 {
+        bi = 0
+        while bi < 24 {
+            clen := lz4_compress(&blocks, bi * blk_len, blk_len, $&ht, $&comp)
+            lz4_decompress(&comp, clen, $&decomp)
+            $h := clen
+            i = 0
+            while i < blk_len {
+                h = (h * 131 + decomp[i]) % mod_v
+                i += 1
+            }
+            total_comp += clen
+            ck = (ck * 31 + h) % mod_v
+            bi += 1
+        }
+        rnd += 1
+    }
+
+    println(total_comp)
+    println(ck)
+    << 0
+}

@@ -1,0 +1,267 @@
+@main
+
+fn main() int {
+    $prefixes := []string{}
+    prefixes.push("tokyo")
+    prefixes.push("oslo")
+    prefixes.push("lima")
+    prefixes.push("cairo")
+    prefixes.push("paris")
+    prefixes.push("rome")
+    prefixes.push("zurich")
+    prefixes.push("seoul")
+    prefixes.push("bergen")
+    prefixes.push("kyoto")
+    prefixes.push("milan")
+    prefixes.push("vienna")
+    prefixes.push("prague")
+    prefixes.push("dublin")
+    prefixes.push("lisbon")
+    prefixes.push("athens")
+
+    $st_bytes := []int{}
+    $st_off := []int{}
+    $st_len := []int{}
+    $i := 0
+    while i < 64 {
+        p := prefixes[i & 15]
+        off := st_bytes.len
+        st_off.push(off)
+        $ci := 0
+        while ci < p.len {
+            st_bytes.push(p[ci] & 255)
+            ci += 1
+        }
+        st_bytes.push(95)
+        st_bytes.push(48 + (i / 10))
+        st_bytes.push(48 + (i % 10))
+        st_len.push(st_bytes.len - off)
+        i += 1
+    }
+
+    $buf := []int{}
+    $digs := []int{}
+    i = 0
+    while i < 16 {
+        digs.push(0)
+        i += 1
+    }
+    $rng := 135792468
+    $ri := 0
+    while ri < 100000 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        si := (rng >> 10) & 63
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        t_val := (rng % 1999) - 999
+        off := st_off[si]
+        ln := st_len[si]
+        $k := 0
+        while k < ln {
+            buf.push(st_bytes[off + k])
+            k += 1
+        }
+        buf.push(59)
+        $av := t_val
+        if av < 0 {
+            buf.push(45)
+            av = -av
+        }
+        whole := av / 10
+        if whole == 0 {
+            buf.push(48)
+        } else {
+            $w := whole
+            $dc := 0
+            while w > 0 {
+                digs[dc] = 48 + (w % 10)
+                dc += 1
+                w /= 10
+            }
+            $di := dc - 1
+            while di >= 0 {
+                buf.push(digs[di])
+                di -= 1
+            }
+        }
+        buf.push(46)
+        buf.push(48 + (av % 10))
+        buf.push(10)
+        ri += 1
+    }
+
+    n := buf.len
+    $first_dot := 0
+    while first_dot < n && buf[first_dot] != 46 {
+        first_dot += 1
+    }
+    orig_frac := buf[first_dot + 1] - 48
+
+    cap := 256
+    mask := 255
+    $k_start := []int{}
+    $k_len := []int{}
+    $st_min := []int{}
+    $st_max := []int{}
+    $st_sum := []int{}
+    $st_cnt := []int{}
+    $occ := []int{}
+    i = 0
+    while i < cap {
+        k_start.push(-1)
+        k_len.push(0)
+        st_min.push(0)
+        st_max.push(0)
+        st_sum.push(0)
+        st_cnt.push(0)
+        occ.push(0)
+        i += 1
+    }
+
+    $tot_rows := 0
+    $tot_ck := 0
+    $rd := 0
+    while rd < 10 {
+        buf[first_dot + 1] = 48 + ((orig_frac + rd) % 10)
+        i = 0
+        while i < cap {
+            k_start[i] = -1
+            i += 1
+        }
+        $pos := 0
+        $rows := 0
+        while pos < n {
+            s_start := pos
+            $h := 0
+            while buf[pos] != 59 {
+                h = (h * 131 + buf[pos]) & 2147483647
+                pos += 1
+            }
+            s_len := pos - s_start
+            pos += 1
+            $neg := false
+            if buf[pos] == 45 {
+                neg = true
+                pos += 1
+            }
+            $v := 0
+            while buf[pos] != 46 {
+                v = v * 10 + (buf[pos] - 48)
+                pos += 1
+            }
+            pos += 1
+            v = v * 10 + (buf[pos] - 48)
+            pos += 1
+            if neg {
+                v = -v
+            }
+            if pos < n && buf[pos] == 10 {
+                pos += 1
+            }
+            rows += 1
+
+            $slot := h & mask
+            while true {
+                ks := k_start[slot]
+                if ks == -1 {
+                    k_start[slot] = s_start
+                    k_len[slot] = s_len
+                    st_min[slot] = v
+                    st_max[slot] = v
+                    st_sum[slot] = v
+                    st_cnt[slot] = 1
+                    <-
+                }
+                if k_len[slot] == s_len {
+                    $eq := true
+                    $ci := 0
+                    while ci < s_len {
+                        if buf[ks + ci] != buf[s_start + ci] {
+                            eq = false
+                            <-
+                        }
+                        ci += 1
+                    }
+                    if eq {
+                        if v < st_min[slot] { st_min[slot] = v }
+                        if v > st_max[slot] { st_max[slot] = v }
+                        st_sum[slot] += v
+                        st_cnt[slot] += 1
+                        <-
+                    }
+                }
+                slot = (slot + 1) & mask
+            }
+        }
+
+        $occ_len := 0
+        i = 0
+        while i < cap {
+            if k_start[i] != -1 {
+                occ[occ_len] = i
+                occ_len += 1
+            }
+            i += 1
+        }
+        i = 1
+        while i < occ_len {
+            key_slot := occ[i]
+            $j := i - 1
+            while j >= 0 {
+                a := occ[j]
+                la := k_len[a]
+                lb := k_len[key_slot]
+                $ml := la
+                if lb < ml { ml = lb }
+                $cmp := 0
+                $t := 0
+                while t < ml {
+                    ba := buf[k_start[a] + t]
+                    bb := buf[k_start[key_slot] + t]
+                    if ba != bb {
+                        if ba < bb {
+                            cmp = -1
+                        } else {
+                            cmp = 1
+                        }
+                        <-
+                    }
+                    t += 1
+                }
+                if cmp == 0 {
+                    if la < lb {
+                        cmp = -1
+                    } else if la > lb {
+                        cmp = 1
+                    }
+                }
+                if cmp > 0 {
+                    occ[j + 1] = occ[j]
+                    j -= 1
+                } else {
+                    <-
+                }
+            }
+            occ[j + 1] = key_slot
+            i += 1
+        }
+
+        $ck := 0
+        i = 0
+        while i < occ_len {
+            sl := occ[i]
+            $s_mod := st_sum[sl] % 1000000007
+            if s_mod < 0 {
+                s_mod += 1000000007
+            }
+            term := ((i + 1) * 7 + (st_min[sl] + 1000) * 13 + (st_max[sl] + 1000) * 17 + st_cnt[sl] * 19 + s_mod) % 1000000007
+            ck = (ck * 1000003 + term) % 1000000007
+            i += 1
+        }
+        tot_rows += rows
+        tot_ck = (tot_ck * 31 + ck) % 1000000007
+        rd += 1
+    }
+    println(tot_rows)
+    println(tot_ck)
+    << 0
+}

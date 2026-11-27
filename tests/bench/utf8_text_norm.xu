@@ -1,0 +1,227 @@
+@main
+
+fn enc_cp(out $&[]int, cp int) {
+    if cp < 128 {
+        out.push(cp)
+    } else if cp < 2048 {
+        out.push(192 | (cp >> 6))
+        out.push(128 | (cp & 63))
+    } else if cp < 65536 {
+        out.push(224 | (cp >> 12))
+        out.push(128 | ((cp >> 6) & 63))
+        out.push(128 | (cp & 63))
+    } else {
+        out.push(240 | (cp >> 18))
+        out.push(128 | ((cp >> 12) & 63))
+        out.push(128 | ((cp >> 6) & 63))
+        out.push(128 | (cp & 63))
+    }
+}
+
+fn main() int {
+    mod_v := 1000000007
+    $rng := 246801357
+    $src := []int{}
+
+    while src.len < 65520 {
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        r := rng % 100
+        if r < 38 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            k := rng % 62
+            $cp := 0
+            if k < 26 {
+                cp = 65 + k
+            } else if k < 52 {
+                cp = 97 + (k - 26)
+            } else {
+                cp = 48 + (k - 52)
+            }
+            enc_cp($&src, cp)
+        } else if r < 52 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            w := rng % 6
+            if w == 0 {
+                enc_cp($&src, 32)
+            } else if w == 1 {
+                enc_cp($&src, 9)
+            } else if w == 2 {
+                enc_cp($&src, 10)
+            } else if w == 3 {
+                enc_cp($&src, 13)
+            } else if w == 4 {
+                enc_cp($&src, 160)
+            } else {
+                enc_cp($&src, 12288)
+            }
+        } else if r < 64 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            g := rng % 3
+            $cp := 0
+            if g == 0 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                cp = 192 + (rng % 62)
+            } else if g == 1 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                cp = 913 + (rng % 40)
+            } else {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                cp = 1040 + (rng % 64)
+            }
+            enc_cp($&src, cp)
+        } else if r < 78 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            $cp := 0
+            if (rng & 3) == 0 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                qi := rng & 3
+                if qi == 0 {
+                    cp = 8216
+                } else if qi == 1 {
+                    cp = 8217
+                } else if qi == 2 {
+                    cp = 8220
+                } else {
+                    cp = 8221
+                }
+            } else {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                cp = 65281 + (rng % 94)
+            }
+            enc_cp($&src, cp)
+        } else if r < 90 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            enc_cp($&src, 19968 + (rng % 512))
+        } else if r < 97 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            enc_cp($&src, 128512 + (rng % 64))
+        } else {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            inv := rng % 4
+            if inv == 0 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                src.push(128 + (rng % 64))
+            } else if inv == 1 {
+                src.push(192)
+                src.push(175)
+            } else if inv == 2 {
+                src.push(237)
+                src.push(160)
+                src.push(128)
+            } else {
+                src.push(244)
+                src.push(144)
+                src.push(128)
+                src.push(128)
+            }
+        }
+    }
+
+    n := src.len
+    $out_buf := []int{}
+    $k := 0
+    while k < n * 3 {
+        out_buf.push(0)
+        k += 1
+    }
+
+    $total_out := 0
+    $ck := 0
+    $rnd := 0
+    while rnd < 40 {
+        $i := 0
+        $olen := 0
+        $in_ws := 1
+        while i < n {
+            b0 := src[i]
+            $cp := 65533
+            $adv := 1
+            if b0 < 128 {
+                cp = b0
+                adv = 1
+            } else if b0 >= 194 && b0 <= 223 {
+                if i + 1 < n && (src[i + 1] & 192) == 128 {
+                    cp = ((b0 & 31) << 6) | (src[i + 1] & 63)
+                    adv = 2
+                }
+            } else if b0 >= 224 && b0 <= 239 {
+                if i + 2 < n && (src[i + 1] & 192) == 128 && (src[i + 2] & 192) == 128 {
+                    c := ((b0 & 15) << 12) | ((src[i + 1] & 63) << 6) | (src[i + 2] & 63)
+                    if c >= 2048 && (c < 55296 || c > 57343) {
+                        cp = c
+                        adv = 3
+                    }
+                }
+            } else if b0 >= 240 && b0 <= 244 {
+                if i + 3 < n && (src[i + 1] & 192) == 128 && (src[i + 2] & 192) == 128 && (src[i + 3] & 192) == 128 {
+                    c := ((b0 & 7) << 18) | ((src[i + 1] & 63) << 12) | ((src[i + 2] & 63) << 6) | (src[i + 3] & 63)
+                    if c >= 65536 && c <= 1114111 {
+                        cp = c
+                        adv = 4
+                    }
+                }
+            }
+            i += adv
+
+            if cp == 32 || cp == 9 || cp == 10 || cp == 13 || cp == 160 || cp == 12288 {
+                if in_ws == 0 {
+                    out_buf[olen] = 32
+                    olen += 1
+                    in_ws = 1
+                }
+                ->
+            }
+            in_ws = 0
+            if cp >= 65281 && cp <= 65374 {
+                cp -= 65248
+            }
+            if cp >= 65 && cp <= 90 {
+                cp += 32
+            } else if (cp >= 192 && cp <= 214) || (cp >= 216 && cp <= 222) {
+                cp += 32
+            } else if (cp >= 913 && cp <= 929) || (cp >= 931 && cp <= 939) {
+                cp += 32
+            } else if cp >= 1040 && cp <= 1071 {
+                cp += 32
+            } else if cp == 8216 || cp == 8217 {
+                cp = 39
+            } else if cp == 8220 || cp == 8221 {
+                cp = 34
+            }
+
+            if cp < 128 {
+                out_buf[olen] = cp
+                olen += 1
+            } else if cp < 2048 {
+                out_buf[olen] = 192 | (cp >> 6)
+                out_buf[olen + 1] = 128 | (cp & 63)
+                olen += 2
+            } else if cp < 65536 {
+                out_buf[olen] = 224 | (cp >> 12)
+                out_buf[olen + 1] = 128 | ((cp >> 6) & 63)
+                out_buf[olen + 2] = 128 | (cp & 63)
+                olen += 3
+            } else {
+                out_buf[olen] = 240 | (cp >> 18)
+                out_buf[olen + 1] = 128 | ((cp >> 12) & 63)
+                out_buf[olen + 2] = 128 | ((cp >> 6) & 63)
+                out_buf[olen + 3] = 128 | (cp & 63)
+                olen += 4
+            }
+        }
+
+        $h := olen
+        $j := 0
+        while j < olen {
+            h = (h * 131 + out_buf[j]) % mod_v
+            j += 1
+        }
+        total_out += olen
+        ck = (ck * 31 + h) % mod_v
+        rnd += 1
+    }
+
+    println(total_out)
+    println(ck)
+    << 0
+}

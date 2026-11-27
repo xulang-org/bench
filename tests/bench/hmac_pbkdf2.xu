@@ -1,0 +1,394 @@
+@main
+
+#strings
+
+fn rotr32(x int, n int) int {
+    << ((x >> n) | ((x << (32 - n)) & 4294967295)) & 4294967295
+}
+
+fn sha256_block(state $&[]int, blk &[]int, off int, w $&[]int, kv &[]int) {
+    $t := 0
+    while t < 16 {
+        j := off + t * 4
+        w[t] = (blk[j] << 24) | (blk[j + 1] << 16) | (blk[j + 2] << 8) | blk[j + 3]
+        t += 1
+    }
+    while t < 64 {
+        w15 := w[t - 15]
+        w2 := w[t - 2]
+        s0 := rotr32(w15, 7) ^ rotr32(w15, 18) ^ (w15 >> 3)
+        s1 := rotr32(w2, 17) ^ rotr32(w2, 19) ^ (w2 >> 10)
+        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & 4294967295
+        t += 1
+    }
+    $a := state[0]
+    $b := state[1]
+    $c := state[2]
+    $d := state[3]
+    $e := state[4]
+    $f := state[5]
+    $g := state[6]
+    $h := state[7]
+    t = 0
+    while t < 64 {
+        bs1 := rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25)
+        ch := (e & f) ^ ((e ^ 4294967295) & g)
+        temp1 := (h + bs1 + ch + kv[t] + w[t]) & 4294967295
+        bs0 := rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22)
+        maj := (a & b) ^ (a & c) ^ (b & c)
+        temp2 := (bs0 + maj) & 4294967295
+        h = g
+        g = f
+        f = e
+        e = (d + temp1) & 4294967295
+        d = c
+        c = b
+        b = a
+        a = (temp1 + temp2) & 4294967295
+        t += 1
+    }
+    state[0] = (state[0] + a) & 4294967295
+    state[1] = (state[1] + b) & 4294967295
+    state[2] = (state[2] + c) & 4294967295
+    state[3] = (state[3] + d) & 4294967295
+    state[4] = (state[4] + e) & 4294967295
+    state[5] = (state[5] + f) & 4294967295
+    state[6] = (state[6] + g) & 4294967295
+    state[7] = (state[7] + h) & 4294967295
+}
+
+fn sha256_compute(msg &[]int, mlen int, state $&[]int, pad $&[]int, w $&[]int, kv &[]int, iv &[]int, out $&[]int) {
+    $i := 0
+    while i < 8 {
+        state[i] = iv[i]
+        i += 1
+    }
+    $pos := 0
+    while pos + 64 <= mlen {
+        sha256_block(state, msg, pos, w, kv)
+        pos += 64
+    }
+    rem := mlen - pos
+    $pi := 0
+    while pi < rem {
+        pad[pi] = msg[pos + pi]
+        pi += 1
+    }
+    pad[rem] = 128
+    pi = rem + 1
+    $total_len := 64
+    if rem >= 56 {
+        total_len = 128
+    }
+    while pi < total_len - 8 {
+        pad[pi] = 0
+        pi += 1
+    }
+    bitlen := mlen * 8
+    $bi := 0
+    while bi < 8 {
+        pad[total_len - 8 + bi] = (bitlen >> ((7 - bi) * 8)) & 255
+        bi += 1
+    }
+    sha256_block(state, pad, 0, w, kv)
+    if total_len == 128 {
+        sha256_block(state, pad, 64, w, kv)
+    }
+    i = 0
+    while i < 8 {
+        sv := state[i]
+        out[i * 4] = (sv >> 24) & 255
+        out[i * 4 + 1] = (sv >> 16) & 255
+        out[i * 4 + 2] = (sv >> 8) & 255
+        out[i * 4 + 3] = sv & 255
+        i += 1
+    }
+}
+
+fn hmac_sha256(
+    key &[]int, klen int,
+    msg &[]int, mlen int,
+    ipad $&[]int, opad $&[]int,
+    inner_buf $&[]int, outer_buf $&[]int,
+    inner_hash $&[]int,
+    state $&[]int, pad $&[]int, w $&[]int, kv &[]int, iv &[]int,
+    out $&[]int
+) {
+    $i := 0
+    while i < 64 {
+        $kb := 0
+        if i < klen {
+            kb = key[i]
+        }
+        ipad[i] = kb ^ 54
+        opad[i] = kb ^ 92
+        inner_buf[i] = ipad[i]
+        outer_buf[i] = opad[i]
+        i += 1
+    }
+    i = 0
+    while i < mlen {
+        inner_buf[64 + i] = msg[i]
+        i += 1
+    }
+    sha256_compute(inner_buf, 64 + mlen, state, pad, w, kv, iv, inner_hash)
+    i = 0
+    while i < 32 {
+        outer_buf[64 + i] = inner_hash[i]
+        i += 1
+    }
+    sha256_compute(outer_buf, 96, state, pad, w, kv, iv, out)
+}
+
+fn push_4d(buf $&[]int, v int) {
+    buf.push(48 + ((v / 1000) % 10))
+    buf.push(48 + ((v / 100) % 10))
+    buf.push(48 + ((v / 10) % 10))
+    buf.push(48 + (v % 10))
+}
+
+fn push_3d(buf $&[]int, v int) {
+    buf.push(48 + ((v / 100) % 10))
+    buf.push(48 + ((v / 10) % 10))
+    buf.push(48 + (v % 10))
+}
+
+fn push_2d(buf $&[]int, v int) {
+    buf.push(48 + ((v / 10) % 10))
+    buf.push(48 + (v % 10))
+}
+
+fn push_5d(buf $&[]int, v int) {
+    buf.push(48 + ((v / 10000) % 10))
+    buf.push(48 + ((v / 1000) % 10))
+    buf.push(48 + ((v / 100) % 10))
+    buf.push(48 + ((v / 10) % 10))
+    buf.push(48 + (v % 10))
+}
+
+fn push_lit(buf $&[]int, s string) {
+    $i := 0
+    while i < s.len {
+        buf.push(s[i] & 255)
+        i += 1
+    }
+}
+
+fn main() int {
+    $iv := []int{}
+    iv.push(1779033703)
+    iv.push(3144134277)
+    iv.push(1013904242)
+    iv.push(2773480762)
+    iv.push(1359893119)
+    iv.push(2600822924)
+    iv.push(528734635)
+    iv.push(1541459225)
+    $kv := []int{}
+    kv.push(1116352408)
+    kv.push(1899447441)
+    kv.push(3049323471)
+    kv.push(3921009573)
+    kv.push(961987163)
+    kv.push(1508970993)
+    kv.push(2453635748)
+    kv.push(2870763221)
+    kv.push(3624381080)
+    kv.push(310598401)
+    kv.push(607225278)
+    kv.push(1426881987)
+    kv.push(1925078388)
+    kv.push(2162078206)
+    kv.push(2614888103)
+    kv.push(3248222580)
+    kv.push(3835390401)
+    kv.push(4022224774)
+    kv.push(264347078)
+    kv.push(604807628)
+    kv.push(770255983)
+    kv.push(1249150122)
+    kv.push(1555081692)
+    kv.push(1996064986)
+    kv.push(2554220882)
+    kv.push(2821834349)
+    kv.push(2952996808)
+    kv.push(3210313671)
+    kv.push(3336571891)
+    kv.push(3584528711)
+    kv.push(113926993)
+    kv.push(338241895)
+    kv.push(666307205)
+    kv.push(773529912)
+    kv.push(1294757372)
+    kv.push(1396182291)
+    kv.push(1695183700)
+    kv.push(1986661051)
+    kv.push(2177026350)
+    kv.push(2456956037)
+    kv.push(2730485921)
+    kv.push(2820302411)
+    kv.push(3259730800)
+    kv.push(3345764771)
+    kv.push(3516065817)
+    kv.push(3600352804)
+    kv.push(4094571909)
+    kv.push(275423344)
+    kv.push(430227734)
+    kv.push(506948616)
+    kv.push(659060556)
+    kv.push(883997877)
+    kv.push(958139571)
+    kv.push(1322822218)
+    kv.push(1537002063)
+    kv.push(1747873779)
+    kv.push(1955562222)
+    kv.push(2024104815)
+    kv.push(2227730452)
+    kv.push(2361852424)
+    kv.push(2428436474)
+    kv.push(2756734187)
+    kv.push(3204031479)
+    kv.push(3329325298)
+
+    $state := []int{}
+    $w := []int{}
+    $pad := []int{}
+    $ipad := []int{}
+    $opad := []int{}
+    $inner_buf := []int{}
+    $outer_buf := []int{}
+    $inner_hash := []int{}
+    $dk := []int{}
+    $u_buf := []int{}
+    $u_in := []int{}
+    $acc := []int{}
+
+    $z := 0
+    while z < 256 {
+        inner_buf.push(0)
+        outer_buf.push(0)
+        z += 1
+    }
+    z = 0
+    while z < 128 {
+        pad.push(0)
+        z += 1
+    }
+    z = 0
+    while z < 64 {
+        w.push(0)
+        ipad.push(0)
+        opad.push(0)
+        z += 1
+    }
+    z = 0
+    while z < 32 {
+        inner_hash.push(0)
+        dk.push(0)
+        u_buf.push(0)
+        u_in.push(0)
+        acc.push(0)
+        z += 1
+    }
+    z = 0
+    while z < 8 {
+        state.push(0)
+        z += 1
+    }
+
+    $pw := []int{}
+    $salt := []int{}
+    $key := []int{}
+    $msg := []int{}
+
+    $ops := 0
+    $i := 0
+    while i < 80 {
+        pw = []int{}
+        push_lit($&pw, "xu-pass-")
+        push_3d($&pw, i)
+        push_lit($&pw, "-secret")
+
+        salt = []int{}
+        push_lit($&salt, "salt-")
+        push_4d($&salt, i * 7)
+        push_lit($&salt, "-v1")
+        salt.push(0)
+        salt.push(0)
+        salt.push(0)
+        salt.push(1)
+
+        hmac_sha256(&pw, pw.len, &salt, salt.len, $&ipad, $&opad, $&inner_buf, $&outer_buf, $&inner_hash, $&state, $&pad, $&w, &kv, &iv, $&u_buf)
+        $bi := 0
+        while bi < 32 {
+            dk[bi] = u_buf[bi]
+            bi += 1
+        }
+        $it := 1
+        while it < 1000 {
+            bi = 0
+            while bi < 32 {
+                u_in[bi] = u_buf[bi]
+                bi += 1
+            }
+            hmac_sha256(&pw, pw.len, &u_in, 32, $&ipad, $&opad, $&inner_buf, $&outer_buf, $&inner_hash, $&state, $&pad, $&w, &kv, &iv, $&u_buf)
+            bi = 0
+            while bi < 32 {
+                dk[bi] = dk[bi] ^ u_buf[bi]
+                bi += 1
+            }
+            it += 1
+        }
+        bi = 0
+        while bi < 32 {
+            acc[bi] = acc[bi] ^ dk[bi]
+            bi += 1
+        }
+        ops += 1
+        i += 1
+    }
+
+    i = 0
+    while i < 200 {
+        key = []int{}
+        push_lit($&key, "jwt-hmac-key-")
+        push_2d($&key, i % 16)
+
+        msg = []int{}
+        push_lit($&msg, "eyJhbGciOiJIUzI1NiJ9.sub=user_")
+        push_4d($&msg, i)
+        push_lit($&msg, "&seq=")
+        push_5d($&msg, i * 37)
+
+        hmac_sha256(&key, key.len, &msg, msg.len, $&ipad, $&opad, $&inner_buf, $&outer_buf, $&inner_hash, $&state, $&pad, $&w, &kv, &iv, $&u_buf)
+        $bi := 0
+        while bi < 32 {
+            acc[bi] = acc[bi] ^ u_buf[bi]
+            bi += 1
+        }
+        ops += 1
+        i += 1
+    }
+
+    println(ops)
+    $hb := strings.builder()
+    $hi := 0
+    while hi < 32 {
+        v := acc[hi]
+        h1 := (v >> 4) & 15
+        h2 := v & 15
+        if h1 < 10 {
+            hb.write_byte(48 + h1)
+        } else {
+            hb.write_byte(87 + h1)
+        }
+        if h2 < 10 {
+            hb.write_byte(48 + h2)
+        } else {
+            hb.write_byte(87 + h2)
+        }
+        hi += 1
+    }
+    println(hb.text())
+    << 0
+}

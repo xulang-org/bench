@@ -1,0 +1,190 @@
+@main
+
+#math
+
+fn main() int {
+    $cx := []f64{}
+    $cy := []f64{}
+    $cz := []f64{}
+    $cr := []f64{}
+    $sr := []f64{}
+    $sg := []f64{}
+    $sb := []f64{}
+    $refl := []f64{}
+
+    $i := 0
+    while i < 16 {
+        cx.push(0.0)
+        cy.push(0.0)
+        cz.push(0.0)
+        cr.push(0.0)
+        sr.push(0.0)
+        sg.push(0.0)
+        sb.push(0.0)
+        refl.push(0.0)
+        i += 1
+    }
+
+    cx[0] = 0.0
+    cy[0] = -1001.5
+    cz[0] = -6.0
+    cr[0] = 1000.0
+    sr[0] = 0.45
+    sg[0] = 0.48
+    sb[0] = 0.52
+    refl[0] = 0.25
+
+    $rng := 44556677
+    i = 1
+    while i < 16 {
+        row := (i - 1) / 5
+        col := (i - 1) % 5
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        cx[i] = -3.2 + f64(col) * 1.6 + f64((rng % 41) - 20) / 128.0
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        cy[i] = -0.7 + f64(row) * 1.1 + f64((rng % 33) - 16) / 128.0
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        cz[i] = -4.2 - f64(row) * 1.8 - f64(rng % 33) / 64.0
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        cr[i] = 0.45 + f64(rng % 17) / 64.0
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        sr[i] = 0.25 + f64(rng % 48) / 64.0
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        sg[i] = 0.25 + f64(rng % 48) / 64.0
+        rng = (rng * 1103515245 + 12345) & 2147483647
+        sb[i] = 0.25 + f64(rng % 48) / 64.0
+        refl[i] = 0.2 + f64(i % 4) * 0.15
+        i += 1
+    }
+
+    lx := 0.5773502691896258
+    ly := 0.5773502691896258
+    lz := 0.5773502691896258
+    w := 320
+    h := 240
+    $hit_count := 0
+    $total_lum := 0.0
+
+    $py := 0
+    while py < h {
+        v := (0.5 - (f64(py) + 0.5) / 240.0) * 1.5
+        $px := 0
+        while px < w {
+            u := ((f64(px) + 0.5) / 320.0 - 0.5) * 2.0
+            inv_l := 1.0 / math.sqrt(u * u + v * v + 1.0)
+            $ox := 0.0
+            $oy := 0.2
+            $oz := 0.0
+            $dx := u * inv_l
+            $dy := v * inv_l
+            $dz := -1.0 * inv_l
+            $att := 1.0
+            $pr := 0.0
+            $pg := 0.0
+            $pb := 0.0
+
+            $depth := 0
+            while depth < 3 {
+                $best_t := 1.0e18
+                $best_i := -1
+                i = 0
+                while i < 16 {
+                    ocx := ox - cx[i]
+                    ocy := oy - cy[i]
+                    ocz := oz - cz[i]
+                    b := ocx * dx + ocy * dy + ocz * dz
+                    c := ocx * ocx + ocy * ocy + ocz * ocz - cr[i] * cr[i]
+                    disc := b * b - c
+                    if disc > 0.0 {
+                        t := -b - math.sqrt(disc)
+                        if t > 0.0005 && t < best_t {
+                            best_t = t
+                            best_i = i
+                        }
+                    }
+                    i += 1
+                }
+                if best_i == -1 {
+                    sky := 0.5 * (dy + 1.0)
+                    pr += att * (0.2 + 0.4 * sky)
+                    pg += att * (0.3 + 0.4 * sky)
+                    pb += att * (0.5 + 0.4 * sky)
+                    <-
+                }
+                hit_count += 1
+                hx := ox + dx * best_t
+                hy := oy + dy * best_t
+                hz := oz + dz * best_t
+                inv_r := 1.0 / cr[best_i]
+                nx := (hx - cx[best_i]) * inv_r
+                ny := (hy - cy[best_i]) * inv_r
+                nz := (hz - cz[best_i]) * inv_r
+
+                sox := hx + nx * 0.002
+                soy := hy + ny * 0.002
+                soz := hz + nz * 0.002
+                $in_shadow := 0
+                $j := 0
+                while j < 16 {
+                    ocx := sox - cx[j]
+                    ocy := soy - cy[j]
+                    ocz := soz - cz[j]
+                    b := ocx * lx + ocy * ly + ocz * lz
+                    c := ocx * ocx + ocy * ocy + ocz * ocz - cr[j] * cr[j]
+                    disc := b * b - c
+                    if disc > 0.0 {
+                        st := -b - math.sqrt(disc)
+                        if st > 0.0005 {
+                            in_shadow = 1
+                            <-
+                        }
+                    }
+                    j += 1
+                }
+
+                $diff := 0.0
+                $spec := 0.0
+                if in_shadow == 0 {
+                    ndotl := nx * lx + ny * ly + nz * lz
+                    if ndotl > 0.0 {
+                        diff = ndotl
+                        hx2 := lx - dx
+                        hy2 := ly - dy
+                        hz2 := lz - dz
+                        hinv := 1.0 / math.sqrt(hx2 * hx2 + hy2 * hy2 + hz2 * hz2)
+                        ndoth := (nx * hx2 + ny * hy2 + nz * hz2) * hinv
+                        if ndoth > 0.0 {
+                            s2 := ndoth * ndoth
+                            s4 := s2 * s2
+                            spec = s4 * s4 * 0.5
+                        }
+                    }
+                }
+                shade := 0.1 + 0.75 * diff
+                kr := refl[best_i]
+                pr += att * (1.0 - kr) * (sr[best_i] * shade + spec)
+                pg += att * (1.0 - kr) * (sg[best_i] * shade + spec)
+                pb += att * (1.0 - kr) * (sb[best_i] * shade + spec)
+                att = att * kr
+                if att < 0.02 {
+                    <-
+                }
+                dot2 := 2.0 * (dx * nx + dy * ny + dz * nz)
+                dx = dx - dot2 * nx
+                dy = dy - dot2 * ny
+                dz = dz - dot2 * nz
+                ox = sox
+                oy = soy
+                oz = soz
+                depth += 1
+            }
+            total_lum += pr + pg + pb
+            px += 1
+        }
+        py += 1
+    }
+
+    println(hit_count)
+    println(int(math.floor(total_lum * 10.0 + 0.5)))
+    << 0
+}

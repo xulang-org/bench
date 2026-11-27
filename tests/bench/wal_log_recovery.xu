@@ -1,0 +1,235 @@
+@main
+
+fn crc32_slice(crc_tbl &[]int, buf &[]int, start int, length int) int {
+    mask32 := 4294967295
+    $c := mask32
+    $i := start
+    end := start + length
+    while i < end {
+        idx := (c ^ buf[i]) & 255
+        c = crc_tbl[idx] ^ (c >> 8)
+        i += 1
+    }
+    << c ^ mask32
+}
+
+fn kv_put(kv_key $&[]int, kv_val $&[]int, k int, v int) {
+    kv_mask := 8191
+    $slot := ((k * 2654435761) >> 16) & kv_mask
+    $first_tomb := -1
+    while true {
+        cur := kv_key[slot]
+        if cur == k {
+            kv_val[slot] = v
+            <-
+        }
+        if cur == -1 {
+            $dst := slot
+            if first_tomb != -1 {
+                dst = first_tomb
+            }
+            kv_key[dst] = k
+            kv_val[dst] = v
+            <-
+        }
+        if cur == -2 && first_tomb == -1 {
+            first_tomb = slot
+        }
+        slot = (slot + 1) & kv_mask
+    }
+}
+
+fn kv_del(kv_key $&[]int, kv_val $&[]int, k int) {
+    kv_mask := 8191
+    $slot := ((k * 2654435761) >> 16) & kv_mask
+    while true {
+        cur := kv_key[slot]
+        if cur == -1 {
+            <-
+        }
+        if cur == k {
+            kv_key[slot] = -2
+            kv_val[slot] = 0
+            <-
+        }
+        slot = (slot + 1) & kv_mask
+    }
+}
+
+fn kv_get(kv_key &[]int, kv_val &[]int, k int) int {
+    kv_mask := 8191
+    $slot := ((k * 2654435761) >> 16) & kv_mask
+    while true {
+        cur := kv_key[slot]
+        if cur == -1 {
+            << -1
+        }
+        if cur == k {
+            << kv_val[slot]
+        }
+        slot = (slot + 1) & kv_mask
+    }
+    << -1
+}
+
+fn main() int {
+    mod_v := 1000000007
+    poly := 3988292384
+    $crc_tbl := []int{}
+    $i := 0
+    while i < 256 {
+        $c := i
+        $b := 0
+        while b < 8 {
+            if (c & 1) != 0 {
+                c = poly ^ (c >> 1)
+            } else {
+                c = c >> 1
+            }
+            b += 1
+        }
+        crc_tbl.push(c)
+        i += 1
+    }
+
+    kv_cap := 8192
+    $kv_key := []int{}
+    $kv_val := []int{}
+    i = 0
+    while i < kv_cap {
+        kv_key.push(-1)
+        kv_val.push(0)
+        i += 1
+    }
+
+    $buf := []int{}
+    i = 0
+    while i < 180000 {
+        buf.push(0)
+        i += 1
+    }
+
+    $rng := 999888777
+    $lsn := 1
+    $replayed := 0
+    $ck := 0
+
+    $seg := 0
+    while seg < 40 {
+        $blen := 0
+        $rec := 0
+        while rec < 3000 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            $op := 1
+            if (rng % 6) == 0 {
+                op = 2
+            }
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            key := rng % 4096
+            $vlen := 0
+            if op == 1 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                vlen = 8 + (rng % 32)
+            }
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            seed := (rng >> 4) & 255
+
+            rec_start := blen
+            buf[blen] = 87
+            buf[blen + 1] = 76
+            buf[blen + 2] = op
+            buf[blen + 3] = (lsn ^ key) & 255
+            buf[blen + 4] = lsn & 255
+            buf[blen + 5] = (lsn >> 8) & 255
+            buf[blen + 6] = (lsn >> 16) & 255
+            buf[blen + 7] = (lsn >> 24) & 255
+            buf[blen + 8] = key & 255
+            buf[blen + 9] = (key >> 8) & 255
+            buf[blen + 10] = (key >> 16) & 255
+            buf[blen + 11] = (key >> 24) & 255
+            buf[blen + 12] = vlen & 255
+            buf[blen + 13] = (vlen >> 8) & 255
+            blen += 14
+            $j := 0
+            while j < vlen {
+                buf[blen] = (seed + j * 13 + lsn) & 255
+                blen += 1
+                j += 1
+            }
+            crc := crc32_slice(&crc_tbl, &buf, rec_start, 14 + vlen)
+            buf[blen] = crc & 255
+            buf[blen + 1] = (crc >> 8) & 255
+            buf[blen + 2] = (crc >> 16) & 255
+            buf[blen + 3] = (crc >> 24) & 255
+            blen += 4
+            lsn += 1
+            rec += 1
+        }
+
+        if (seg % 4) == 3 {
+            blen -= 7
+        } else if (seg % 5) == 4 {
+            buf[blen - 2] = buf[blen - 2] ^ 1
+        }
+
+        $pos := 0
+        $seg_rep := 0
+        $early := 0
+        while pos < blen {
+            if pos + 18 > blen {
+                early = 1
+                <-
+            }
+            if buf[pos] != 87 || buf[pos + 1] != 76 {
+                early = 1
+                <-
+            }
+            op := buf[pos + 2]
+            if op != 1 && op != 2 {
+                early = 1
+                <-
+            }
+            vlen := buf[pos + 12] | (buf[pos + 13] << 8)
+            if pos + 18 + vlen > blen {
+                early = 1
+                <-
+            }
+            stored := buf[pos + 14 + vlen] | (buf[pos + 15 + vlen] << 8) | (buf[pos + 16 + vlen] << 16) | (buf[pos + 17 + vlen] << 24)
+            calc := crc32_slice(&crc_tbl, &buf, pos, 14 + vlen)
+            if calc != stored {
+                early = 1
+                <-
+            }
+            key := buf[pos + 8] | (buf[pos + 9] << 8) | (buf[pos + 10] << 16) | (buf[pos + 11] << 24)
+            if op == 1 {
+                $vh := 0
+                $j := 0
+                while j < vlen {
+                    vh = (vh * 131 + buf[pos + 14 + j]) % mod_v
+                    j += 1
+                }
+                kv_put($&kv_key, $&kv_val, key, vh)
+            } else {
+                kv_del($&kv_key, $&kv_val, key)
+            }
+            seg_rep += 1
+            pos += 18 + vlen
+        }
+        replayed += seg_rep
+        ck = (ck * 37 + seg * 1009 + seg_rep * 17 + early) % mod_v
+        seg += 1
+    }
+
+    $k := 0
+    while k < 4096 {
+        v := kv_get(&kv_key, &kv_val, k)
+        if v >= 0 {
+            ck = (ck * 31 + k * 97 + v) % mod_v
+        }
+        k += 1
+    }
+
+    println(replayed)
+    println(ck)
+    << 0
+}

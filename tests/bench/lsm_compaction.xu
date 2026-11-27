@@ -1,0 +1,263 @@
+@main
+
+fn less_rec(k1 int, s1 int, k2 int, s2 int) int {
+    if k1 != k2 {
+        if k1 < k2 {
+            << 1
+        }
+        << 0
+    }
+    if s1 > s2 {
+        << 1
+    }
+    << 0
+}
+
+fn swap_run(rk $&[]int, rs $&[]int, rv $&[]int, rt $&[]int, a int, b int) {
+    tk := rk[a]
+    rk[a] = rk[b]
+    rk[b] = tk
+    ts := rs[a]
+    rs[a] = rs[b]
+    rs[b] = ts
+    tv := rv[a]
+    rv[a] = rv[b]
+    rv[b] = tv
+    tt := rt[a]
+    rt[a] = rt[b]
+    rt[b] = tt
+}
+
+fn sift_max_run(rk $&[]int, rs $&[]int, rv $&[]int, rt $&[]int, start int, n int) {
+    $i := start
+    while true {
+        l := i * 2 + 1
+        if l >= n {
+            <-
+        }
+        $best := l
+        r := l + 1
+        if r < n && less_rec(rk[best], rs[best], rk[r], rs[r]) == 1 {
+            best = r
+        }
+        if less_rec(rk[i], rs[i], rk[best], rs[best]) == 1 {
+            swap_run(rk, rs, rv, rt, i, best)
+            i = best
+        } else {
+            <-
+        }
+    }
+}
+
+fn heapsort_run(rk $&[]int, rs $&[]int, rv $&[]int, rt $&[]int, n int) {
+    $start := (n / 2) - 1
+    while start >= 0 {
+        sift_max_run(rk, rs, rv, rt, start, n)
+        start -= 1
+    }
+    $end := n - 1
+    while end > 0 {
+        swap_run(rk, rs, rv, rt, 0, end)
+        sift_max_run(rk, rs, rv, rt, 0, end)
+        end -= 1
+    }
+}
+
+fn heap_less(all_k &[]int, all_s &[]int, run_pos &[]int, ra int, rb int) int {
+    pa := run_pos[ra]
+    pb := run_pos[rb]
+    << less_rec(all_k[pa], all_s[pa], all_k[pb], all_s[pb])
+}
+
+fn sift_min_merge(heap $&[]int, hsz int, all_k &[]int, all_s &[]int, run_pos &[]int) {
+    $i := 0
+    while true {
+        l := i * 2 + 1
+        if l >= hsz {
+            <-
+        }
+        $best := l
+        rr := l + 1
+        if rr < hsz && heap_less(all_k, all_s, run_pos, heap[rr], heap[best]) == 1 {
+            best = rr
+        }
+        if heap_less(all_k, all_s, run_pos, heap[best], heap[i]) == 1 {
+            tmp := heap[i]
+            heap[i] = heap[best]
+            heap[best] = tmp
+            i = best
+        } else {
+            <-
+        }
+    }
+}
+
+fn main() int {
+    mod_v := 1000000007
+    $rng := 555123456
+    $global_seq := 1
+    $l1_k := []int{}
+    $l1_v := []int{}
+    $hits := 0
+    $ck := 0
+
+    $rk := []int{}
+    $rs := []int{}
+    $rv := []int{}
+    $rt := []int{}
+    $i := 0
+    while i < 12000 {
+        rk.push(0)
+        rs.push(0)
+        rv.push(0)
+        rt.push(0)
+        i += 1
+    }
+
+    $cyc := 0
+    while cyc < 4 {
+        $all_k := []int{}
+        $all_s := []int{}
+        $all_v := []int{}
+        $all_t := []int{}
+        $run_pos := []int{}
+        $run_end := []int{}
+
+        $rn := 0
+        while rn < 8 {
+            $j := 0
+            while j < 12000 {
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                k := rng % 40000
+                rng = (rng * 1103515245 + 12345) & 2147483647
+                $tomb := 0
+                if (rng % 10) == 0 {
+                    tomb = 1
+                }
+                $val := 0
+                if tomb == 0 {
+                    rng = (rng * 1103515245 + 12345) & 2147483647
+                    val = 1 + (rng % 100000)
+                }
+                rk[j] = k
+                rs[j] = global_seq
+                rv[j] = val
+                rt[j] = tomb
+                global_seq += 1
+                j += 1
+            }
+            heapsort_run($&rk, $&rs, $&rv, $&rt, 12000)
+            st := all_k.len
+            $prev_k := -1
+            j = 0
+            while j < 12000 {
+                if rk[j] != prev_k {
+                    all_k.push(rk[j])
+                    all_s.push(rs[j])
+                    all_v.push(rv[j])
+                    all_t.push(rt[j])
+                    prev_k = rk[j]
+                }
+                j += 1
+            }
+            run_pos.push(st)
+            run_end.push(all_k.len)
+            rn += 1
+        }
+
+        if l1_k.len > 0 {
+            st := all_k.len
+            $j := 0
+            while j < l1_k.len {
+                all_k.push(l1_k[j])
+                all_s.push(0)
+                all_v.push(l1_v[j])
+                all_t.push(0)
+                j += 1
+            }
+            run_pos.push(st)
+            run_end.push(all_k.len)
+        }
+
+        $heap := []int{}
+        $r := 0
+        while r < run_pos.len {
+            if run_pos[r] < run_end[r] {
+                heap.push(r)
+                $hi := heap.len - 1
+                while hi > 0 {
+                    p := (hi - 1) >> 1
+                    if heap_less(&all_k, &all_s, &run_pos, heap[hi], heap[p]) == 1 {
+                        tmp := heap[hi]
+                        heap[hi] = heap[p]
+                        heap[p] = tmp
+                        hi = p
+                    } else {
+                        <-
+                    }
+                }
+            }
+            r += 1
+        }
+
+        $new_k := []int{}
+        $new_v := []int{}
+        $last_k := -1
+        $hsz := heap.len
+        while hsz > 0 {
+            top_r := heap[0]
+            pos := run_pos[top_r]
+            k := all_k[pos]
+            v := all_v[pos]
+            t := all_t[pos]
+            run_pos[top_r] = pos + 1
+            if run_pos[top_r] < run_end[top_r] {
+                sift_min_merge($&heap, hsz, &all_k, &all_s, &run_pos)
+            } else {
+                hsz -= 1
+                if hsz > 0 {
+                    heap[0] = heap[hsz]
+                    sift_min_merge($&heap, hsz, &all_k, &all_s, &run_pos)
+                }
+            }
+            if k != last_k {
+                last_k = k
+                if t == 0 {
+                    new_k.push(k)
+                    new_v.push(v)
+                }
+            }
+        }
+
+        l1_k = new_k
+        l1_v = new_v
+        n_l1 := l1_k.len
+        ck = (ck * 37 + n_l1) % mod_v
+
+        $q := 0
+        while q < 60000 {
+            rng = (rng * 1103515245 + 12345) & 2147483647
+            qk := rng % 40000
+            $lo := 0
+            $hi := n_l1
+            while lo < hi {
+                mid := (lo + hi) >> 1
+                if l1_k[mid] < qk {
+                    lo = mid + 1
+                } else {
+                    hi = mid
+                }
+            }
+            if lo < n_l1 && l1_k[lo] == qk {
+                hits += 1
+                ck = (ck * 31 + l1_v[lo]) % mod_v
+            }
+            q += 1
+        }
+        cyc += 1
+    }
+
+    println(hits)
+    println(ck)
+    << 0
+}
