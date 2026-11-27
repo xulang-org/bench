@@ -5,8 +5,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import bench_crosslang as crosslang
 import bench_opt_levels as levels
 from bench_crosslang import BENCHES, cross_src
 
@@ -34,6 +36,17 @@ class PeerCompilationTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("swiftc"), "Swift reference compiler unavailable")
     def test_swift_aes_compiles_with_shared_software_kernel(self):
         self.compile_and_run("swiftc", "swift", "aes128_key_setup", levels.swiftc_compile_argv)
+
+    def test_swift_link_flags_match_platform(self):
+        with mock.patch.object(crosslang.sys, "platform", "linux"):
+            self.assertEqual(crosslang.swift_link_flags(), ["-Xlinker", "-lm"])
+            argv = levels.swiftc_compile_argv("swiftc", cross_src("startup", "swift"), 1, Path("/tmp/out"))
+            self.assertEqual(argv[-2:], ["-Xlinker", "-lm"])
+        for plat in ("darwin", "win32"):
+            with mock.patch.object(crosslang.sys, "platform", plat):
+                self.assertEqual(crosslang.swift_link_flags(), [])
+                argv = levels.swiftc_compile_argv("swiftc", cross_src("startup", "swift"), 1, Path("/tmp/out"))
+                self.assertNotIn("-lm", argv)
 
 
 if __name__ == "__main__":

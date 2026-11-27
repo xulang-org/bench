@@ -101,6 +101,11 @@ def c_link_flags() -> list[str]:
     return ["-lm"] if sys.platform != "win32" else []
 
 
+def swift_link_flags() -> list[str]:
+    """Link libm on Linux for Swift workloads emitting floor/math calls."""
+    return ["-Xlinker", "-lm"] if sys.platform.startswith("linux") else []
+
+
 def select_c_compiler(explicit: str | None, target: str | None) -> str:
     # Apple cross-target flags require Clang; host builds may use GCC.
     name = explicit or ("clang" if target or which("clang") else "gcc")
@@ -839,11 +844,11 @@ def main():
                 add(
                     "swiftc -Onone",
                     bench.name,
-                    ["swiftc", *swift_cache_flags, "-Onone", "-o", str(out0), *peer_sources(bench.name, "swift")],
+                    ["swiftc", *swift_cache_flags, "-Onone", "-o", str(out0), *peer_sources(bench.name, "swift"), *swift_link_flags()],
                     out0,
                 )
             outo = tmp / f"sw_{bench.name}_o{ext}"
-            add("swiftc -O", bench.name, ["swiftc", *swift_cache_flags, "-O", "-o", str(outo), *peer_sources(bench.name, "swift")], outo)
+            add("swiftc -O", bench.name, ["swiftc", *swift_cache_flags, "-O", "-o", str(outo), *peer_sources(bench.name, "swift"), *swift_link_flags()], outo)
 
     log("## runtime + resources + binary size")
     log(
@@ -1021,6 +1026,7 @@ def main():
                             "-o",
                             str(tmp / f"ct_sw_{bench.name}"),
                             *peer_sources(bench.name, "swift"),
+                            *swift_link_flags(),
                         ],
                     )
                 )

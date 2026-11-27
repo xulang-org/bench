@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: xulang-org/xu
-          ref: 15d2d511eb589118e706db3f289ae84ceceed9fd
+          ref: 7813e2498e30ee79aa1bf515eb9c2efc06c0c93d
           path: xu
       - uses: actions/setup-python@v7
         with:
