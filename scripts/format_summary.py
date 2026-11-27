@@ -616,10 +616,59 @@ def _split_crosslang_sections(content: str) -> dict[str, list[str]]:
     return sections
 
 
+def _toolchain_major_minor(version: str) -> tuple[int, int] | None:
+    """Extract (major, minor) from a compiler version banner."""
+    match = re.search(r"(\d+)\.(\d+)(?:\.\d+)?", version)
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def _merge_shard_toolchains(
+    platform_id: str,
+    shard_toolchains: list[tuple[int, dict[str, str | None]]],
+) -> dict[str, str | None]:
+    """Merge per-shard toolchains, tolerating patch-only runner rollout drift."""
+    ordered = sorted(shard_toolchains, key=lambda item: item[0])
+    keys: list[str] = ["clang", "rustc", "go", "swiftc"]
+    for _, tc in ordered:
+        for key in tc:
+            if key not in keys:
+                keys.append(key)
+
+    first_tc = ordered[0][1]
+    merged: dict[str, str | None] = {}
+    for key in keys:
+        values = [tc.get(key) for _, tc in ordered]
+        if all(val == values[0] for val in values):
+            merged[key] = values[0]
+            continue
+
+        bad_idx = next(idx for idx, tc in ordered if tc.get(key) != values[0])
+        if any(val is None for val in values):
+            raise ValueError(
+                f"{platform_id}: toolchain versions differ across shards (shard {bad_idx}): "
+                f"{ordered[bad_idx - 1][1] if bad_idx <= len(ordered) else values} != {first_tc}"
+            )
+
+        non_none = [val for val in values if val is not None]
+        major_minors = [_toolchain_major_minor(val) for val in non_none]
+        if any(mm is None for mm in major_minors) or len(set(major_minors)) > 1:
+            mismatch_tc = next(tc for idx, tc in ordered if idx == bad_idx)
+            raise ValueError(
+                f"{platform_id}: toolchain versions differ across shards (shard {bad_idx}): "
+                f"{mismatch_tc} != {first_tc}"
+            )
+
+        merged[key] = " / ".join(sorted(set(non_none)))
+    return merged
+
+
 def _build_merged_crosslang_txt(
     sorted_shards: list[tuple[int, int, str]],
     ordered_benches: list[str],
     shard_total: int,
+    merged_toolchains: dict[str, str | None] | None = None,
 ) -> str:
     first_content = sorted_shards[0][2]
     first_sections = _split_crosslang_sections(first_content)
@@ -627,6 +676,7 @@ def _build_merged_crosslang_txt(
     header_lines: list[str] = []
     saw_benches = False
     saw_shard = False
+    replaced_tools: set[str] = set()
     for line in first_sections["header"]:
         if line.startswith("# benches: "):
             header_lines.append(f"# benches: {', '.join(ordered_benches)}")
@@ -635,7 +685,20 @@ def _build_merged_crosslang_txt(
             header_lines.append(f"# merged_shards: {shard_total}")
             saw_shard = True
         else:
-            header_lines.append(line)
+            tool_replaced = False
+            if merged_toolchains:
+                for tool, val in merged_toolchains.items():
+                    if val and line.startswith(f"# {tool}: "):
+                        header_lines.append(f"# {tool}: {val}")
+                        replaced_tools.add(tool)
+                        tool_replaced = True
+                        break
+            if not tool_replaced:
+                header_lines.append(line)
+    if merged_toolchains:
+        for tool, val in merged_toolchains.items():
+            if val and tool not in replaced_tools:
+                header_lines.append(f"# {tool}: {val}")
     if not saw_benches:
         header_lines.append(f"# benches: {', '.join(ordered_benches)}")
     if not saw_shard:
@@ -700,7 +763,6 @@ def merge_platform_shards(
     seen_indices: set[int] = set()
     declared_total: int | None = None
     first_identity: dict | None = None
-    first_toolchains: dict | None = None
     first_rss_method: str | None = None
 
     for sdir in shard_dirs:
@@ -745,13 +807,6 @@ def merge_platform_shards(
             )
 
         toolchains = parse_toolchains(content)
-        if first_toolchains is None:
-            first_toolchains = toolchains
-        elif toolchains != first_toolchains:
-            raise ValueError(
-                f"{platform_id}: toolchain versions differ across shards (shard {idx}): "
-                f"{toolchains} != {first_toolchains}"
-            )
 
         rss_method = _parse_rss_method(content)
         if first_rss_method is None:
@@ -765,7 +820,7 @@ def merge_platform_shards(
         shard_parsed = parse_crosslang_txt(content)
         parsed_shards.append((idx, total, content, identity, toolchains, shard_parsed, rss_method))
 
-    assert declared_total is not None and first_identity is not None and first_toolchains is not None
+    assert declared_total is not None and first_identity is not None
     if expected_shard_total is not None and declared_total != expected_shard_total:
         raise ValueError(
             f"{platform_id}: expected {expected_shard_total} shards, got {declared_total}"
@@ -804,17 +859,23 @@ def merge_platform_shards(
             + [b for b in shard_order_names if b not in ref_set]
         )
 
+    merged_toolchains = _merge_shard_toolchains(
+        platform_id,
+        [(idx, tc) for idx, _total, _content, _id, tc, _parsed, _rss in parsed_shards],
+    )
+
     merged_txt = _build_merged_crosslang_txt(
         [(idx, total, content) for idx, total, content, *_ in parsed_shards],
         ordered_benches,
         declared_total,
+        merged_toolchains=merged_toolchains,
     )
     merged_parsed = parse_crosslang_txt(merged_txt)
     if list(merged_parsed) != ordered_benches:
         raise ValueError(f"{platform_id}: merged crosslang.txt order mismatch")
 
     meta = {
-        "toolchains": first_toolchains,
+        "toolchains": merged_toolchains,
         "rss_method": first_rss_method or "unrecorded",
         "xu_version": first_identity["xu_version"],
         "os": resolved_os,

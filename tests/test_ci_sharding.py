@@ -318,6 +318,84 @@ class TestShardMergeAndImportCompatibility(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "duplicate benchmark"):
                 summary.merge_platform_shards(write_shards(dup_name=buckets[0][0].name), root / "o5", platform_id=pid)
 
+    def test_merge_accepts_patch_rollout_and_rejects_minor_drift(self) -> None:
+        plan = summary.plan_ci_matrix(mode="full", benches="", shards="auto")
+        canonical = [b.name for b in suite.BENCHES]
+        tc_base = {
+            "clang": "Ubuntu clang version 21.1.8 (6ubuntu1)",
+            "rustc": "rustc 1.100.1 (20ddd0171 2026-11-25)",
+            "go": "go version go1.27.4 linux/amd64",
+            "swiftc": "Swift version 6.4.2 (swift-6.4.2-RELEASE)",
+        }
+        tc_patch = {
+            **tc_base,
+            "swiftc": "Swift version 6.4.3 (swift-6.4.3-RELEASE)",
+        }
+        tc_minor = {
+            **tc_base,
+            "swiftc": "Swift version 6.3.1 (swift-6.3.1-RELEASE)",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shards_root = root / "all-shards"
+            out_root = root / "all-reports"
+
+            for pid, total in plan["platform_shards"].items():
+                buckets = suite.partition_shards(list(suite.BENCHES), total)
+                identity = _make_identity(pid)
+                rss = "linux-post-exec-vmhwm-v1" if pid.startswith("linux-") else "wait4"
+                for idx, bucket in enumerate(buckets, start=1):
+                    sdir = shards_root / f"benchmark-shard-{pid}-{idx}-of-{total}"
+                    sdir.mkdir(parents=True, exist_ok=True)
+                    (sdir / "compiler-identity.json").write_text(
+                        json.dumps(identity, indent=2) + "\n", encoding="utf-8"
+                    )
+                    tc = tc_patch if (pid == "linux-x64" and idx == 2) else tc_base
+                    (sdir / "crosslang.txt").write_text(
+                        _make_shard_report([b.name for b in bucket], idx, total, toolchains=tc, rss_method=rss),
+                        encoding="utf-8",
+                    )
+
+            merged = summary.merge_all_platform_shards(
+                shards_root,
+                out_root,
+                platform_shards=plan["platform_shards"],
+                expect_full_registry=True,
+            )
+            expected_swift = "Swift version 6.4.2 (swift-6.4.2-RELEASE) / Swift version 6.4.3 (swift-6.4.3-RELEASE)"
+            self.assertEqual(merged["linux-x64"]["metadata"]["toolchains"]["swiftc"], expected_swift)
+            merged_txt = (out_root / "benchmark-reports-linux-x64" / "crosslang.txt").read_text(encoding="utf-8")
+            self.assertIn(f"# swiftc: {expected_swift}", merged_txt)
+
+            site_scripts = ROOT.parent / "xulang-org" / "scripts"
+            if (site_scripts / "import-benchmarks.py").is_file():
+                import importlib.util
+                sys.path.insert(0, str(site_scripts))
+                spec = importlib.util.spec_from_file_location("import_benchmarks", site_scripts / "import-benchmarks.py")
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                with patch.object(mod, "require_bench_commit", return_value=None):
+                    imported = mod.load(out_root, "0.14.1", "a" * 40, "12345678", "2026-11-27", bench_root=ROOT)
+                self.assertEqual(imported["platforms"]["linux-x64"]["toolchains"]["swiftc"], expected_swift)
+                self.assertEqual(imported["metadata"]["total_benches"], len(canonical))
+
+            # Minor version drift must still fail closed.
+            bad_dirs = []
+            buckets = suite.partition_shards(list(suite.BENCHES), 2)
+            for idx, bucket in enumerate(buckets, start=1):
+                sdir = root / f"minor_{idx}"
+                sdir.mkdir(parents=True, exist_ok=True)
+                (sdir / "compiler-identity.json").write_text(json.dumps(_make_identity("linux-x64")), encoding="utf-8")
+                tc = tc_minor if idx == 2 else tc_base
+                (sdir / "crosslang.txt").write_text(
+                    _make_shard_report([b.name for b in bucket], idx, 2, toolchains=tc),
+                    encoding="utf-8",
+                )
+                bad_dirs.append(sdir)
+            with self.assertRaisesRegex(ValueError, "toolchain"):
+                summary.merge_platform_shards(bad_dirs, root / "minor_out", platform_id="linux-x64")
+
     def test_workflow_yml_structure(self) -> None:
         wf = (ROOT / ".github" / "workflows" / "bench.yml").read_text(encoding="utf-8")
         for needle in (
